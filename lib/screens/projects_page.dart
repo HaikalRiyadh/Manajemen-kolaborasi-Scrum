@@ -33,6 +33,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
       // Pastikan durasi adalah angka yang valid dan positif
       final duration = int.tryParse(_durationController.text);
       if (duration == null || duration <= 0) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Durasi Sprint harus berupa angka positif."), backgroundColor: Colors.red),
         );
@@ -42,6 +43,8 @@ class _ProjectsPageState extends State<ProjectsPage> {
       // Panggil fungsi addProject. Duration dikonversi kembali ke String untuk consistency
       // Durasi ini sekarang mewakili durasi sprint awal atau target
       await provider.addProject(_nameController.text.trim(), duration.toString());
+
+      if (!mounted) return;
 
       // Penanganan pesan sukses atau error setelah proses
       if (provider.errorMessage == null) {

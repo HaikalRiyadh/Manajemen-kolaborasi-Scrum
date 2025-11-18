@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../services/sprint_provider.dart'; // Sesuaikan path
-import '../models/models.dart'; // Pastikan TaskStatus dan ScrumTask ada di sini
+
+import '../models/models.dart';
+import '../services/sprint_provider.dart';
 
 class ScrumPage extends StatefulWidget {
   final int projectId;
+
   const ScrumPage({super.key, required this.projectId});
 
   @override
@@ -12,59 +14,105 @@ class ScrumPage extends StatefulWidget {
 }
 
 class _ScrumPageState extends State<ScrumPage> {
-  final TextEditingController _taskController = TextEditingController();
-
-  // Mapping TaskStatus ke judul yang ditampilkan
-  final Map<TaskStatus, String> _statusToTitle = {
-    TaskStatus.backlog: 'Backlog',
-    TaskStatus.toDo: 'To Do',
-    TaskStatus.inProgress: 'In Progress',
-    TaskStatus.done: 'Done',
-  };
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final provider = Provider.of<SprintProvider>(context, listen: false);
-      provider.clearError();
-      provider.fetchTasks(widget.projectId);
+      Provider.of<SprintProvider>(context, listen: false).fetchProjectDetails(widget.projectId);
     });
   }
 
-  // --- FUNGSI UTAMA ---
+  void _showAddTaskDialog(BuildContext context) {
+    final formKey = GlobalKey<FormState>();
+    final titleController = TextEditingController();
+    final pointsController = TextEditingController();
 
-  // Fungsi untuk menampilkan dialog tambah tugas
-  void _addItem(TaskStatus status) {
     showDialog(
       context: context,
-      builder: (BuildContext context) {
+      barrierDismissible: false, // Mencegah dialog ditutup saat proses loading
+      builder: (context) {
+        // Gunakan StatefulBuilder agar bisa update state (loading) di dalam dialog
+        return StatefulBuilder(
+          builder: (context, setState) {
+            bool isAdding = false;
+
+            return AlertDialog(
+              title: const Text('Add New Task'),
+              content: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      controller: titleController,
+                      decoration: const InputDecoration(labelText: 'Task Title', border: OutlineInputBorder()),
+                      validator: (value) => value == null || value.isEmpty ? 'Title is required' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: pointsController,
+                      decoration: const InputDecoration(labelText: 'Story Points', border: OutlineInputBorder()),
+                      keyboardType: TextInputType.number,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) return 'Story Points are required';
+                        if (int.tryParse(value) == null) return 'Must be a number';
+                        return null;
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                ElevatedButton(
+                  // Nonaktifkan tombol saat loading
+                  onPressed: isAdding ? null : () async {
+                    if (formKey.currentState!.validate()) {
+                      setState(() => isAdding = true); // Mulai loading
+
+                      final provider = Provider.of<SprintProvider>(context, listen: false);
+                      // Tunggu (await) sampai proses addTask selesai
+                      await provider.addTask(
+                        widget.projectId,
+                        titleController.text,
+                        int.parse(pointsController.text),
+                      );
+                      
+                      // Tutup dialog setelah semuanya selesai
+                      if (mounted) Navigator.pop(context);
+                    }
+                  },
+                  child: isAdding 
+                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                      : const Text('Add Task'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Dialog konfirmasi untuk menghapus task
+  void _showDeleteConfirmationDialog(BuildContext context, ScrumTask task) {
+    showDialog(
+      context: context,
+      builder: (BuildContext ctx) {
         return AlertDialog(
-          title: Text('Add New Task to "${_statusToTitle[status]}"'),
-          content: TextField(
-              controller: _taskController,
-              autofocus: true,
-              decoration: const InputDecoration(hintText: 'Task title')),
+          title: const Text('Delete Task'),
+          content: Text('Are you sure you want to delete "${task.title}"?'),
           actions: <Widget>[
             TextButton(
               child: const Text('Cancel'),
-              onPressed: () {
-                _taskController.clear();
-                Navigator.of(context).pop();
-              },
+              onPressed: () => Navigator.of(ctx).pop(),
             ),
-            TextButton(
-              child: const Text('Add'),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text('Delete'),
               onPressed: () {
-                if (_taskController.text.isNotEmpty) {
-                  Provider.of<SprintProvider>(context, listen: false).addTask(
-                    widget.projectId,
-                    _taskController.text.trim(),
-                    status,
-                  );
-                  _taskController.clear();
-                  Navigator.of(context).pop();
-                }
+                Provider.of<SprintProvider>(context, listen: false).deleteTask(task.id, widget.projectId);
+                Navigator.of(ctx).pop();
               },
             ),
           ],
@@ -73,259 +121,157 @@ class _ScrumPageState extends State<ScrumPage> {
     );
   }
 
-  // Fungsi untuk memanggil provider hapus tugas
-  void _deleteItem(String taskId) {
-    Provider.of<SprintProvider>(context, listen: false).deleteTask(widget.projectId, taskId);
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Consumer<SprintProvider>(
+          builder: (context, provider, child) {
+            final project = provider.projects.firstWhere((p) => p.id == widget.projectId, orElse: () => Project(id: 0, name: "Loading...", duration: 0));
+            return Text('Scrum Board: ${project.name}');
+          },
+        ),
+      ),
+      body: Consumer<SprintProvider>(
+        builder: (context, provider, child) {
+          // --- PENANGANAN ERROR DENGAN SNACKBAR ---
+          if (provider.errorMessage != null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(provider.errorMessage!),
+                  backgroundColor: Colors.red,
+                ),
+              );
+              provider.clearError(); // Reset error setelah ditampilkan
+            });
+          }
+
+          if (provider.isLoading && provider.projects.indexWhere((p) => p.id == widget.projectId) == -1) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final project = provider.projects.firstWhere((p) => p.id == widget.projectId, orElse: () => Project(id: 0, name: "Unknown", duration: 0));
+          if (project.id == 0) {
+            return const Center(child: Text('Project not found.'));
+          }
+
+          final Map<TaskStatus, List<ScrumTask>> tasksByStatus = {
+            TaskStatus.backlog: [],
+            TaskStatus.toDo: [],
+            TaskStatus.inProgress: [],
+            TaskStatus.done: [],
+          };
+
+          for (var task in project.tasks) {
+            tasksByStatus[task.status]!.add(task);
+          }
+
+          return ListView.builder(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            itemCount: tasksByStatus.length,
+            itemBuilder: (context, index) {
+              TaskStatus status = tasksByStatus.keys.elementAt(index);
+              List<ScrumTask> tasks = tasksByStatus[status]!;
+              return _buildTaskColumn(context, status, tasks);
+            },
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showAddTaskDialog(context),
+        tooltip: 'Add Task',
+        child: const Icon(Icons.add),
+      ),
+    );
   }
 
-  // Fungsi untuk memanggil provider pindah tugas (menggunakan tombol panah)
-  void _moveTask(String taskId, TaskStatus currentStatus, bool forward) {
-    final statusList = TaskStatus.values;
-    final currentIndex = statusList.indexOf(currentStatus);
-    final provider = Provider.of<SprintProvider>(context, listen: false);
-
-    if (forward && currentIndex < statusList.length - 1) {
-      provider.updateTaskStatus(widget.projectId, taskId, statusList[currentIndex + 1]);
-    } else if (!forward && currentIndex > 0) {
-      provider.updateTaskStatus(widget.projectId, taskId, statusList[currentIndex - 1]);
-    }
+  Widget _buildTaskColumn(BuildContext context, TaskStatus status, List<ScrumTask> tasks) {
+    return DragTarget<ScrumTask>(
+      onWillAccept: (task) => task?.status != status,
+      onAccept: (task) {
+        Provider.of<SprintProvider>(context, listen: false).updateTaskStatus(task, status, widget.projectId);
+      },
+      builder: (context, candidateData, rejectedData) {
+        return Container(
+          width: 280,
+          margin: const EdgeInsets.all(8.0),
+          decoration: BoxDecoration(
+            color: candidateData.isNotEmpty ? Colors.lightBlue[50] : Colors.grey[200],
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: candidateData.isNotEmpty ? Colors.blueAccent : Colors.transparent, width: 2),
+          ),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Text(
+                  status.name.toUpperCase().replaceAll('_', ' '),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
+                ),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(8.0),
+                  itemCount: tasks.length,
+                  itemBuilder: (context, index) {
+                    final task = tasks[index];
+                    return Draggable<ScrumTask>(
+                      data: task,
+                      feedback: _buildTaskCard(task, isDragging: true),
+                      childWhenDragging: Opacity(opacity: 0.5, child: _buildTaskCard(task)),
+                      child: _buildTaskCard(task),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
-  // --- WIDGET KOMPONEN ---
-
-  // Widget terpisah untuk tampilan Card tugas
-  Widget _TaskCard({
-    required ScrumTask task,
-    required int currentIndex,
-    required List<TaskStatus> statusList,
-    required Function(String, TaskStatus, bool) moveTask,
-    required Function(String) deleteItem,
-  }) {
+  Widget _buildTaskCard(ScrumTask task, {bool isDragging = false}) {
     return Card(
-      elevation: 1.0,
-      margin: const EdgeInsets.symmetric(vertical: 4.0),
+      elevation: isDragging ? 8 : 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      margin: const EdgeInsets.symmetric(vertical: 6),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
-        child: Row(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(child: Text(task.title, softWrap: true, style: const TextStyle(fontSize: 14))),
             Row(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Tombol Pindah Mundur (ke kiri)
-                if (currentIndex > 0)
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_new, size: 16, color: Colors.orange),
-                    onPressed: () => moveTask(task.id, task.status, false),
-                    visualDensity: VisualDensity.compact,
+                Flexible(
+                  child: Text(task.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                ),
+                SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    iconSize: 20,
+                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                    onPressed: () => _showDeleteConfirmationDialog(context, task),
                   ),
-                // Tombol Pindah Maju (ke kanan)
-                if (currentIndex < statusList.length - 1)
-                  IconButton(
-                    icon: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.blue),
-                    onPressed: () => moveTask(task.id, task.status, true),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                // Tombol Hapus
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                  onPressed: () => deleteItem(task.id),
-                  visualDensity: VisualDensity.compact,
                 ),
               ],
             ),
+            const SizedBox(height: 8),
+            Chip(
+              label: Text('${task.storyPoints} Story Points'),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              labelStyle: const TextStyle(fontSize: 12),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            )
           ],
         ),
       ),
     );
-  }
-
-
-  // Widget untuk membangun kartu tugas dengan Draggable
-  Widget _buildTaskItem(ScrumTask task) {
-    final statusList = TaskStatus.values;
-    final currentIndex = statusList.indexOf(task.status);
-    final taskCard = _TaskCard(
-        task: task,
-        currentIndex: currentIndex,
-        statusList: statusList,
-        moveTask: _moveTask,
-        deleteItem: _deleteItem
-    );
-
-    // Draggable: Membuat card ini bisa diseret.
-    return Draggable<String>(
-      data: task.id, // ID tugas yang dibawa saat di-drag
-      feedback: Material(
-        elevation: 4.0,
-        child: Container(
-          width: 260,
-          padding: const EdgeInsets.all(8.0),
-          decoration: BoxDecoration(
-            color: Colors.lightBlue.withOpacity(0.8),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(
-            task.title,
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ),
-      childWhenDragging: Opacity(
-        opacity: 0.4,
-        child: taskCard,
-      ),
-      child: taskCard,
-    );
-  }
-
-  // --- WIDGET BUILDER UTAMA ---
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text("Scrum Board - Project #${widget.projectId}")),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Consumer<SprintProvider>(
-            builder: (context, sprintProvider, child) {
-              // 1. Loading State
-              if (sprintProvider.isLoading && sprintProvider.tasks.isEmpty && sprintProvider.errorMessage == null) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              // 2. Error State
-              if (sprintProvider.errorMessage != null) {
-                return Center(
-                  child: Container(
-                    padding: const EdgeInsets.all(20),
-                    margin: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.red.shade200),
-                      borderRadius: BorderRadius.circular(8),
-                      color: Colors.red.shade50,
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.error_outline, color: Colors.red, size: 40),
-                        const SizedBox(height: 16),
-                        const Text("Terjadi Kesalahan", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                        const SizedBox(height: 8),
-                        Text(
-                          sprintProvider.errorMessage!,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.red.shade700),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }
-
-              // 3. Empty State (Papan Kosong)
-              if (sprintProvider.tasks.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.inbox_outlined, size: 80, color: Colors.grey),
-                      const SizedBox(height: 16),
-                      const Text('Papan Tugas Kosong', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
-                      const Text('Tambahkan tugas baru untuk memulai', style: TextStyle(fontSize: 16, color: Colors.grey)),
-                      const SizedBox(height: 20),
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.add),
-                        label: const Text('Tambah Tugas'),
-                        onPressed: () => _addItem(TaskStatus.backlog),
-                      )
-                    ],
-                  ),
-                );
-              }
-
-              // 4. Scrum Board (Tampilan Utama)
-              return SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  // Membuat kolom untuk setiap status: Backlog, To Do, In Progress, Done
-                  children: TaskStatus.values.map((status) {
-                    final items = sprintProvider.tasks.where((t) => t.status == status).toList();
-                    final columnTitle = _statusToTitle[status]!;
-
-                    // DragTarget: Tempat jatuhnya tugas yang diseret
-                    return DragTarget<String>(
-                      onWillAccept: (data) => data != null,
-                      onAccept: (taskId) {
-                        // Memperbarui status tugas saat Drag & Drop
-                        Provider.of<SprintProvider>(context, listen: false).updateTaskStatus(
-                          widget.projectId,
-                          taskId,
-                          status, // Status tujuan
-                        );
-                      },
-                      builder: (context, candidateData, rejectedData) {
-                        final isDraggingOver = candidateData.isNotEmpty;
-
-                        return Container(
-                          width: 280,
-                          margin: const EdgeInsets.symmetric(horizontal: 6.0),
-                          child: Card(
-                            // Efek visual saat drag di atas kolom
-                            color: isDraggingOver ? Colors.indigo.shade50 : Colors.white,
-                            elevation: 3,
-                            child: Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: Column(
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(columnTitle, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                      // Tombol Add per kolom
-                                      IconButton(icon: const Icon(Icons.add_circle_outline, color: Colors.indigo), onPressed: () => _addItem(status), visualDensity: VisualDensity.compact),
-                                    ],
-                                  ),
-                                  const Divider(),
-                                  // Loading indicator saat ada pembaruan
-                                  if (sprintProvider.isLoading && sprintProvider.isUpdatingTask)
-                                    const LinearProgressIndicator(),
-
-                                  // Daftar Tugas di kolom
-                                  Expanded(
-                                    child: ListView.builder(
-                                      itemCount: items.length,
-                                      itemBuilder: (context, index) {
-                                        return _buildTaskItem(items[index]);
-                                      },
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    );
-                  }).toList(),
-                ),
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _taskController.dispose();
-    super.dispose();
   }
 }
