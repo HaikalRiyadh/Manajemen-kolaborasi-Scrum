@@ -2,12 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-// Ganti 'nama_proyek_anda' dengan nama proyek dari pubspec.yaml
 import '../models/models.dart';
-
-// --- MODELS ---
-// Model ini digunakan oleh semua halaman, jadi kita letakkan di sini.
-// File: lib/models/models.darts
 
 // --- PROVIDER ---
 class SprintProvider with ChangeNotifier {
@@ -18,14 +13,20 @@ class SprintProvider with ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
 
+  // --- PROPERTI BARU UNTUK INDIKATOR LOADING KHUSUS (SOLUSI ERROR) ---
+  bool _isUpdatingTask = false;
+
+  // GETTERS
   List<Project> get projects => _projects;
   List<ScrumTask> get tasks => _tasks;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
+  // --- GETTER BARU ---
+  bool get isUpdatingTask => _isUpdatingTask;
+
   void clearError() {
     _errorMessage = null;
-    // Tidak perlu notifyListeners() jika tidak ingin UI rebuild hanya untuk membersihkan error
   }
 
   // --- FUNGSI UNTUK PROJECTS ---
@@ -89,6 +90,9 @@ class SprintProvider with ChangeNotifier {
   }
 
   Future<void> addTask(int projectId, String title, TaskStatus status) async {
+    // Menggunakan isUpdatingTask karena operasi ini lebih cepat dari fetchTasks
+    _isUpdatingTask = true;
+    notifyListeners();
     final url = Uri.parse('$_baseUrl/add_task.php');
     try {
       await http.post(url, body: {
@@ -98,29 +102,47 @@ class SprintProvider with ChangeNotifier {
     } catch (e) {
       _errorMessage = "Gagal menambah tugas: ${e.toString()}";
       notifyListeners();
+    } finally {
+      _isUpdatingTask = false;
+      notifyListeners();
     }
   }
 
   Future<void> updateTaskStatus(int projectId, String taskId, TaskStatus newStatus) async {
+    // --- IMPLEMENTASI LOGIKA isUpdatingTask DI SINI ---
+    _isUpdatingTask = true;
+    notifyListeners(); // Tampilkan indikator loading di kolom segera
+
     final url = Uri.parse('$_baseUrl/update_task_status.php');
     try {
       await http.post(url, body: {
         'task_id': taskId, 'new_status': newStatus.name, 'completion_day': newStatus == TaskStatus.done ? '4' : 'NULL',
       });
+      // Panggil fetchTasks untuk memuat ulang data yang diperbarui
       await fetchTasks(projectId);
     } catch (e) {
       _errorMessage = "Gagal mengupdate status: ${e.toString()}";
+      notifyListeners();
+    } finally {
+      // Sembunyikan indikator loading di kolom setelah operasi selesai
+      _isUpdatingTask = false;
       notifyListeners();
     }
   }
 
   Future<void> deleteTask(int projectId, String taskId) async {
+    // Menggunakan isUpdatingTask karena operasi ini juga memicu fetchTasks
+    _isUpdatingTask = true;
+    notifyListeners();
     final url = Uri.parse('$_baseUrl/delete_task.php');
     try {
       await http.post(url, body: {'task_id': taskId});
       await fetchTasks(projectId);
     } catch (e) {
       _errorMessage = "Gagal menghapus tugas: ${e.toString()}";
+      notifyListeners();
+    } finally {
+      _isUpdatingTask = false;
       notifyListeners();
     }
   }

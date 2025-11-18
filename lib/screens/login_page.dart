@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http; // Import package http
-import 'dart:convert'; // Import untuk jsonDecode
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 import '../screens/register_page.dart';
 import 'home_page.dart';
@@ -14,14 +14,22 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  // Ganti nama controller agar sesuai dengan database
-  final TextEditingController nameController = TextEditingController();
+  final TextEditingController usernameController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  bool _isLoading = false; // State untuk loading indicator
+  bool _isLoading = false;
 
   Future<void> login() async {
-    // Validasi input di sisi client
-    if (nameController.text.isEmpty || passwordController.text.isEmpty) {
+    // === PERBAIKAN START ===
+    // Username di trim karena umumya tidak boleh mengandung spasi di awal/akhir
+    final username = usernameController.text.trim();
+
+    // Password TIDAK di trim, karena spasi adalah bagian dari password
+    // Jika di trim, verifikasi password_verify() di PHP akan gagal
+    final password = passwordController.text;
+    // === PERBAIKAN END ===
+
+
+    if (username.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Nama Pengguna dan password tidak boleh kosong")),
       );
@@ -29,55 +37,62 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     setState(() {
-      _isLoading = true; // Mulai loading
+      _isLoading = true;
     });
 
-    // URL ke API Anda. Ganti 'localhost' dengan IP address Anda jika menjalankan di HP fisik.
-    // Gunakan 10.0.2.2 untuk emulator Android
+    // Menggunakan IP Android Emulator untuk koneksi ke Laragon
     final url = Uri.parse('http://localhost/project_ppl/login.php');
 
     try {
       final response = await http.post(
         url,
         body: {
-          'username': nameController.text,
-          'password': passwordController.text,
+          'username': username,
+          'password': password,
         },
       );
 
-      // Pastikan widget masih ada di tree sebelum memanipulasi context
       if (!mounted) return;
 
+      // Cek status code
       if (response.statusCode == 200) {
-        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        final Map<String, dynamic> data = jsonDecode(response.body);
 
-        if (responseData['status'] == 'success') {
-          // Jika sukses, navigasi ke HomePage
+        if (data['status'] == 'success') {
+          // Navigasi ke halaman utama
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => const HomePage()),
           );
         } else {
-          // Jika gagal, tampilkan pesan error dari server
+          // Tampilkan pesan error dari PHP
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(responseData['message'])),
+            SnackBar(content: Text(data['message'] ?? "Login gagal")),
           );
         }
-      } else {
-        // Error pada server
+      }
+      // Tambahkan penanganan untuk kode error 400 & 401 (dari PHP)
+      else if (response.statusCode == 400 || response.statusCode == 401 || response.statusCode == 404) {
+        final Map<String, dynamic> data = jsonDecode(response.body);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Gagal terhubung ke server.")),
+          SnackBar(content: Text(data['message'] ?? "Autentikasi gagal. Coba lagi.")),
+        );
+      }
+      else {
+        // Tampilkan error server lainnya (misalnya 500)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Server error: ${response.statusCode}")),
         );
       }
     } catch (e) {
-      // Error koneksi (misal tidak ada internet)
       if (!mounted) return;
+      // Pesan error jika tidak bisa terhubung sama sekali (Network Error)
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Terjadi kesalahan: ${e.toString()}")),
+        SnackBar(content: Text("Gagal terhubung ke server (Cek koneksi & Laragon): $e")),
       );
     } finally {
       setState(() {
-        _isLoading = false; // Hentikan loading
+        _isLoading = false;
       });
     }
   }
@@ -91,14 +106,24 @@ class _LoginPageState extends State<LoginPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text("Login", style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+              const Text(
+                "Login",
+                style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 40),
-              // Sesuaikan controller dan hint text
-              CustomInput(controller: nameController, hint: "Nama Pengguna", icon: Icons.person),
+              CustomInput(
+                controller: usernameController,
+                hint: "Nama Pengguna",
+                icon: Icons.person,
+              ),
               const SizedBox(height: 20),
-              CustomInput(controller: passwordController, hint: "Password", icon: Icons.lock, obscure: true),
+              CustomInput(
+                controller: passwordController,
+                hint: "Password",
+                icon: Icons.lock,
+                obscure: true,
+              ),
               const SizedBox(height: 30),
-              // Tampilkan loading indicator atau tombol
               _isLoading
                   ? const CircularProgressIndicator()
                   : ElevatedButton(
@@ -123,7 +148,7 @@ class _LoginPageState extends State<LoginPage> {
                     child: const Text("Register"),
                   ),
                 ],
-              )
+              ),
             ],
           ),
         ),

@@ -29,15 +29,32 @@ class _ProjectsPageState extends State<ProjectsPage> {
     if (_formKey.currentState!.validate()) {
       // Ambil provider
       final provider = Provider.of<SprintProvider>(context, listen: false);
-      // Panggil fungsi addProject
-      await provider.addProject(_nameController.text, _durationController.text);
 
-      // Reset form setelah berhasil
+      // Pastikan durasi adalah angka yang valid dan positif
+      final duration = int.tryParse(_durationController.text);
+      if (duration == null || duration <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Durasi Sprint harus berupa angka positif."), backgroundColor: Colors.red),
+        );
+        return;
+      }
+
+      // Panggil fungsi addProject. Duration dikonversi kembali ke String untuk consistency
+      // Durasi ini sekarang mewakili durasi sprint awal atau target
+      await provider.addProject(_nameController.text.trim(), duration.toString());
+
+      // Penanganan pesan sukses atau error setelah proses
       if (provider.errorMessage == null) {
+        // Berhasil
         _nameController.clear();
         _durationController.clear();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Proyek baru berhasil ditambahkan!"), backgroundColor: Colors.green),
+        );
+      } else {
+        // Gagal (menampilkan error dari provider, misalnya kegagalan server)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Gagal menambahkan proyek: ${provider.errorMessage}"), backgroundColor: Colors.red),
         );
       }
     }
@@ -60,16 +77,34 @@ class _ProjectsPageState extends State<ProjectsPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   TextFormField(
-                    controller: _nameController,
-                    decoration: const InputDecoration(labelText: 'Project Name', border: OutlineInputBorder()),
-                    validator: (value) => value == null || value.isEmpty ? 'Masukkan nama proyek' : null,
+                      controller: _nameController,
+                      decoration: const InputDecoration(labelText: 'Project Name', border: OutlineInputBorder()),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Masukkan nama proyek';
+                        }
+                        return null;
+                      }
                   ),
                   const SizedBox(height: 12),
+                  // 🔥 Perubahan 1: Mengubah label input dari 'Duration (days)' menjadi 'Sprint '
                   TextFormField(
-                    controller: _durationController,
-                    decoration: const InputDecoration(labelText: 'Duration (days)', border: OutlineInputBorder()),
-                    keyboardType: TextInputType.number,
-                    validator: (value) => value == null || value.isEmpty ? 'Masukkan durasi' : null,
+                      controller: _durationController,
+                      decoration: const InputDecoration(labelText: 'Sprint', border: OutlineInputBorder()),
+                      keyboardType: TextInputType.number,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Masukkan durasi sprint';
+                        }
+                        // Validasi tambahan untuk memastikan input adalah angka
+                        if (int.tryParse(value) == null) {
+                          return 'Durasi harus berupa angka';
+                        }
+                        if (int.tryParse(value)! <= 0) {
+                          return 'Durasi harus lebih dari 0 hari';
+                        }
+                        return null;
+                      }
                   ),
                   const SizedBox(height: 16),
                   Consumer<SprintProvider>( // Bungkus tombol dengan Consumer
@@ -78,7 +113,16 @@ class _ProjectsPageState extends State<ProjectsPage> {
                         style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
                         // Nonaktifkan tombol saat loading
                         onPressed: provider.isLoading ? null : _addProject,
-                        child: provider.isLoading ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 3, color: Colors.white)) : const Text('Create Project'),
+                        child: provider.isLoading
+                            ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 3,
+                                color: Colors.white
+                            )
+                        )
+                            : const Text('Create Project'),
                       );
                     },
                   ),
@@ -96,10 +140,21 @@ class _ProjectsPageState extends State<ProjectsPage> {
                 if (provider.isLoading && provider.projects.isEmpty) {
                   return const Center(child: CircularProgressIndicator());
                 }
+
                 // Tampilkan pesan error jika ada
                 if (provider.errorMessage != null && provider.projects.isEmpty) {
-                  return Center(child: Text('Error: ${provider.errorMessage}'));
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: Text(
+                        'Error memuat proyek: ${provider.errorMessage}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  );
                 }
+
                 // Tampilkan pesan jika tidak ada proyek
                 if (provider.projects.isEmpty) {
                   return const Center(child: Text('Belum ada proyek. Silakan buat yang baru.'));
@@ -116,7 +171,8 @@ class _ProjectsPageState extends State<ProjectsPage> {
                         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                         child: ListTile(
                           title: Text(project.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text('Durasi: ${project.duration} hari | Progres: ${project.progress}%'),
+                          // 🔥 Perubahan 2: Mengubah subtitle dari 'Durasi' menjadi 'Sprint'
+                          subtitle: Text('Sprint: ${project.duration} | Progres: ${project.progress}%'),
                           trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                           onTap: () {
                             Navigator.push(

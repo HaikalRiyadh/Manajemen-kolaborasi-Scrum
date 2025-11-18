@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../services/sprint_provider.dart'; // Sesuaikan path jika berbeda
-import '../models/models.dart'; // Pastikan Anda sudah mengimpor ini
+import '../services/sprint_provider.dart'; // Sesuaikan path
+import '../models/models.dart'; // Pastikan TaskStatus dan ScrumTask ada di sini
 
 class ScrumPage extends StatefulWidget {
   final int projectId;
@@ -14,6 +14,7 @@ class ScrumPage extends StatefulWidget {
 class _ScrumPageState extends State<ScrumPage> {
   final TextEditingController _taskController = TextEditingController();
 
+  // Mapping TaskStatus ke judul yang ditampilkan
   final Map<TaskStatus, String> _statusToTitle = {
     TaskStatus.backlog: 'Backlog',
     TaskStatus.toDo: 'To Do',
@@ -24,13 +25,14 @@ class _ScrumPageState extends State<ScrumPage> {
   @override
   void initState() {
     super.initState();
-    // Setelah frame pertama selesai, bersihkan error lama dan muat data baru
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = Provider.of<SprintProvider>(context, listen: false);
       provider.clearError();
       provider.fetchTasks(widget.projectId);
     });
   }
+
+  // --- FUNGSI UTAMA ---
 
   // Fungsi untuk menampilkan dialog tambah tugas
   void _addItem(TaskStatus status) {
@@ -39,7 +41,10 @@ class _ScrumPageState extends State<ScrumPage> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: Text('Add New Task to "${_statusToTitle[status]}"'),
-          content: TextField(controller: _taskController, autofocus: true, decoration: const InputDecoration(hintText: 'Task title')),
+          content: TextField(
+              controller: _taskController,
+              autofocus: true,
+              decoration: const InputDecoration(hintText: 'Task title')),
           actions: <Widget>[
             TextButton(
               child: const Text('Cancel'),
@@ -54,7 +59,7 @@ class _ScrumPageState extends State<ScrumPage> {
                 if (_taskController.text.isNotEmpty) {
                   Provider.of<SprintProvider>(context, listen: false).addTask(
                     widget.projectId,
-                    _taskController.text,
+                    _taskController.text.trim(),
                     status,
                   );
                   _taskController.clear();
@@ -73,7 +78,7 @@ class _ScrumPageState extends State<ScrumPage> {
     Provider.of<SprintProvider>(context, listen: false).deleteTask(widget.projectId, taskId);
   }
 
-  // Fungsi untuk memanggil provider pindah tugas
+  // Fungsi untuk memanggil provider pindah tugas (menggunakan tombol panah)
   void _moveTask(String taskId, TaskStatus currentStatus, bool forward) {
     final statusList = TaskStatus.values;
     final currentIndex = statusList.indexOf(currentStatus);
@@ -86,16 +91,21 @@ class _ScrumPageState extends State<ScrumPage> {
     }
   }
 
-  // Widget untuk membangun setiap kartu tugas
-  Widget _buildTaskItem(ScrumTask task) {
-    final statusList = TaskStatus.values;
-    final currentIndex = statusList.indexOf(task.status);
+  // --- WIDGET KOMPONEN ---
 
+  // Widget terpisah untuk tampilan Card tugas
+  Widget _TaskCard({
+    required ScrumTask task,
+    required int currentIndex,
+    required List<TaskStatus> statusList,
+    required Function(String, TaskStatus, bool) moveTask,
+    required Function(String) deleteItem,
+  }) {
     return Card(
       elevation: 1.0,
       margin: const EdgeInsets.symmetric(vertical: 4.0),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -103,11 +113,26 @@ class _ScrumPageState extends State<ScrumPage> {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // Tombol Pindah Mundur (ke kiri)
                 if (currentIndex > 0)
-                  IconButton(icon: const Icon(Icons.arrow_back, size: 20, color: Colors.orange), onPressed: () => _moveTask(task.id, task.status, false)),
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back_ios_new, size: 16, color: Colors.orange),
+                    onPressed: () => moveTask(task.id, task.status, false),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                // Tombol Pindah Maju (ke kanan)
                 if (currentIndex < statusList.length - 1)
-                  IconButton(icon: const Icon(Icons.arrow_forward, size: 20, color: Colors.blue), onPressed: () => _moveTask(task.id, task.status, true)),
-                IconButton(icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red), onPressed: () => _deleteItem(task.id)),
+                  IconButton(
+                    icon: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.blue),
+                    onPressed: () => moveTask(task.id, task.status, true),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                // Tombol Hapus
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                  onPressed: () => deleteItem(task.id),
+                  visualDensity: VisualDensity.compact,
+                ),
               ],
             ),
           ],
@@ -115,6 +140,49 @@ class _ScrumPageState extends State<ScrumPage> {
       ),
     );
   }
+
+
+  // Widget untuk membangun kartu tugas dengan Draggable
+  Widget _buildTaskItem(ScrumTask task) {
+    final statusList = TaskStatus.values;
+    final currentIndex = statusList.indexOf(task.status);
+    final taskCard = _TaskCard(
+        task: task,
+        currentIndex: currentIndex,
+        statusList: statusList,
+        moveTask: _moveTask,
+        deleteItem: _deleteItem
+    );
+
+    // Draggable: Membuat card ini bisa diseret.
+    return Draggable<String>(
+      data: task.id, // ID tugas yang dibawa saat di-drag
+      feedback: Material(
+        elevation: 4.0,
+        child: Container(
+          width: 260,
+          padding: const EdgeInsets.all(8.0),
+          decoration: BoxDecoration(
+            color: Colors.lightBlue.withOpacity(0.8),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            task.title,
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ),
+      childWhenDragging: Opacity(
+        opacity: 0.4,
+        child: taskCard,
+      ),
+      child: taskCard,
+    );
+  }
+
+  // --- WIDGET BUILDER UTAMA ---
 
   @override
   Widget build(BuildContext context) {
@@ -125,12 +193,12 @@ class _ScrumPageState extends State<ScrumPage> {
           padding: const EdgeInsets.all(12.0),
           child: Consumer<SprintProvider>(
             builder: (context, sprintProvider, child) {
-              // 1. Tampilkan loading indicator
-              if (sprintProvider.isLoading) {
+              // 1. Loading State
+              if (sprintProvider.isLoading && sprintProvider.tasks.isEmpty && sprintProvider.errorMessage == null) {
                 return const Center(child: CircularProgressIndicator());
               }
 
-              // 2. Tampilkan pesan error jika ada
+              // 2. Error State
               if (sprintProvider.errorMessage != null) {
                 return Center(
                   child: Container(
@@ -159,7 +227,7 @@ class _ScrumPageState extends State<ScrumPage> {
                 );
               }
 
-              // 3. Tampilkan pesan jika papan tugas kosong
+              // 3. Empty State (Papan Kosong)
               if (sprintProvider.tasks.isEmpty) {
                 return Center(
                   child: Column(
@@ -181,43 +249,69 @@ class _ScrumPageState extends State<ScrumPage> {
                 );
               }
 
-              // 4. Tampilkan papan scrum jika ada data
+              // 4. Scrum Board (Tampilan Utama)
               return SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  // Membuat kolom untuk setiap status: Backlog, To Do, In Progress, Done
                   children: TaskStatus.values.map((status) {
                     final items = sprintProvider.tasks.where((t) => t.status == status).toList();
                     final columnTitle = _statusToTitle[status]!;
-                    return Container(
-                      width: 280,
-                      margin: const EdgeInsets.symmetric(horizontal: 6.0),
-                      child: Card(
-                        color: Colors.grey[100], elevation: 2,
-                        child: Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Column(
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+
+                    // DragTarget: Tempat jatuhnya tugas yang diseret
+                    return DragTarget<String>(
+                      onWillAccept: (data) => data != null,
+                      onAccept: (taskId) {
+                        // Memperbarui status tugas saat Drag & Drop
+                        Provider.of<SprintProvider>(context, listen: false).updateTaskStatus(
+                          widget.projectId,
+                          taskId,
+                          status, // Status tujuan
+                        );
+                      },
+                      builder: (context, candidateData, rejectedData) {
+                        final isDraggingOver = candidateData.isNotEmpty;
+
+                        return Container(
+                          width: 280,
+                          margin: const EdgeInsets.symmetric(horizontal: 6.0),
+                          child: Card(
+                            // Efek visual saat drag di atas kolom
+                            color: isDraggingOver ? Colors.indigo.shade50 : Colors.white,
+                            elevation: 3,
+                            child: Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Column(
                                 children: [
-                                  Text(columnTitle, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                  IconButton(icon: const Icon(Icons.add_circle_outline), onPressed: () => _addItem(status)),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(columnTitle, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                      // Tombol Add per kolom
+                                      IconButton(icon: const Icon(Icons.add_circle_outline, color: Colors.indigo), onPressed: () => _addItem(status), visualDensity: VisualDensity.compact),
+                                    ],
+                                  ),
+                                  const Divider(),
+                                  // Loading indicator saat ada pembaruan
+                                  if (sprintProvider.isLoading && sprintProvider.isUpdatingTask)
+                                    const LinearProgressIndicator(),
+
+                                  // Daftar Tugas di kolom
+                                  Expanded(
+                                    child: ListView.builder(
+                                      itemCount: items.length,
+                                      itemBuilder: (context, index) {
+                                        return _buildTaskItem(items[index]);
+                                      },
+                                    ),
+                                  ),
                                 ],
                               ),
-                              const Divider(),
-                              Expanded(
-                                child: ListView.builder(
-                                  itemCount: items.length,
-                                  itemBuilder: (context, index) {
-                                    return _buildTaskItem(items[index]);
-                                  },
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
-                        ),
-                      ),
+                        );
+                      },
                     );
                   }).toList(),
                 ),
