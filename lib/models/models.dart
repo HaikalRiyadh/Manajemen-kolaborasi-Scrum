@@ -9,7 +9,7 @@ class ScrumTask {
   String title;
   TaskStatus status;
   final int storyPoints;
-  int? completionDay;
+  int? completionDay; // Menyimpan informasi sprint ke berapa tugas ini selesai
 
   ScrumTask({
     required this.id,
@@ -29,8 +29,9 @@ class ScrumTask {
       title: json['title'],
       status: status,
       storyPoints: int.tryParse(json['story_points'].toString()) ?? 0,
-      completionDay: json['completion_day'] != null
-          ? int.tryParse(json['completion_day'].toString())
+      // Backend akan mengirim 'completion_sprint'
+      completionDay: json['completion_sprint'] != null
+          ? int.tryParse(json['completion_sprint'].toString())
           : null,
     );
   }
@@ -40,17 +41,50 @@ class ScrumTask {
 class Project {
   final int id;
   final String name;
-  final int duration;
-  int progress;
+  final int sprint; // Total durasi sprint
+  int currentSprint;  // Sprint yang sedang berjalan
   List<ScrumTask> tasks;
 
   Project({
     required this.id,
     required this.name,
-    required this.duration,
-    this.progress = 0,
+    required this.sprint,
+    required this.currentSprint,
     this.tasks = const [],
   });
+
+  // Getter untuk menghitung progres secara dinamis berdasarkan story points dan status
+  int get progress {
+    if (tasks.isEmpty) {
+      return 0;
+    }
+    final totalStoryPoints = tasks.fold<int>(0, (sum, task) => sum + task.storyPoints);
+    if (totalStoryPoints == 0) {
+      return tasks.every((task) => task.status == TaskStatus.done) ? 100 : 0;
+    }
+
+    double weightedProgress = 0;
+    for (var task in tasks) {
+      double statusWeight;
+      switch (task.status) {
+        case TaskStatus.backlog:
+          statusWeight = 0;      // 0%
+          break;
+        case TaskStatus.toDo:
+          statusWeight = 0.25;   // 25%
+          break;
+        case TaskStatus.inProgress:
+          statusWeight = 0.75;   // 75%
+          break;
+        case TaskStatus.done:
+          statusWeight = 1.0;    // 100%
+          break;
+      }
+      weightedProgress += task.storyPoints * statusWeight;
+    }
+
+    return ((weightedProgress / totalStoryPoints) * 100).round();
+  }
 
   factory Project.fromJson(Map<String, dynamic> json) {
     var taskList = json['tasks'] as List? ?? [];
@@ -58,9 +92,19 @@ class Project {
     return Project(
       id: int.parse(json['id'].toString()),
       name: json['name'],
-      duration: int.parse(json['duration'].toString()),
-      progress: int.parse(json['progress'].toString()),
+      sprint: int.parse(json['sprint'].toString()),
+      // Ambil 'current_sprint' dari JSON, default-nya 1 jika tidak ada
+      currentSprint: int.tryParse(json['current_sprint']?.toString() ?? '1') ?? 1,
       tasks: tasksData,
     );
   }
+}
+
+// Model untuk data burndown chart
+class BurndownData {
+  final int sprint;
+  final int estimated;
+  final int actual;
+
+  BurndownData({required this.sprint, required this.estimated, required this.actual});
 }

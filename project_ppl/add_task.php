@@ -1,70 +1,49 @@
 <?php
-// CORS & headers
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type");
-header('Content-Type: application/json');
+// 1. Include the central helper file.
+require_once __DIR__ . '/api_helpers.php';
 
-function sendJsonResponse($code, $data) {
-    http_response_code($code);
-    echo json_encode($data);
-    exit();
+// The script continues here. The $conn variable is available.
+// Preflight requests (OPTIONS) are already handled by the helper.
+
+// This endpoint only handles POST requests.
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    sendJsonResponse(405, ['status' => 'error', 'message' => 'Method Not Allowed']);
 }
 
-// Handle preflight
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    sendJsonResponse(200, ["status" => "ok"]);
+// 2. --- PROSES INPUT ---
+$data = $_POST;
+if (empty($data)) {
+    $inputJSON = file_get_contents('php://input');
+    $data = json_decode($inputJSON, TRUE) ?? [];
 }
 
-include 'db_connect.php'; // Memanggil file koneksi
+// Validasi input
+$project_id = isset($data['project_id']) ? intval($data['project_id']) : 0;
+$title = isset($data['title']) ? trim($data['title']) : '';
+$story_points = isset($data['story_points']) ? intval($data['story_points']) : 0;
+$status = isset($data['status']) ? trim($data['status']) : 'backlog'; // Default status
 
-// Accept JSON or form data
-$contentType = $_SERVER['CONTENT_TYPE'] ?? '';
-if (stripos($contentType, 'application/json') !== false) {
-    $raw = file_get_contents('php://input');
-    $data = json_decode($raw, true);
-    if (!is_array($data)) {
-        sendJsonResponse(400, ["status" => "error", "message" => "Invalid JSON body."]);
+if ($project_id <= 0 || $title === '' || $story_points <= 0) {
+    sendJsonResponse(400, ["status" => "error", "message" => "Input tidak lengkap atau tidak valid: project_id, title, dan story_points wajib diisi."]);
+}
+
+// 3. --- OPERASI DATABASE ---
+try {
+    $stmt = $conn->prepare("INSERT INTO tasks (project_id, title, status, story_points) VALUES (?, ?, ?, ?)");
+    if ($stmt === false) {
+        throw new Exception("Gagal menyiapkan statement: " . $conn->error);
     }
-} else {
-    $data = $_POST;
-}
 
-if (!isset($data['project_id'], $data['title'], $data['status'], $data['story_points'])) {
-    sendJsonResponse(400, ["status" => "error", "message" => "Data input tidak lengkap."]);
-}
+    $stmt->bind_param("issi", $project_id, $title, $status, $story_points);
+    $stmt->execute();
+    $insert_id = $conn->insert_id;
 
-// Cast and sanitize
-$project_id = intval($data['project_id']);
-$title = trim($data['title']);
-$status = trim($data['status']);
-$story_points = intval($data['story_points']);
+    sendJsonResponse(201, ["status" => "success", "message" => "Tugas berhasil dibuat", "id" => strval($insert_id)]); // Kirim ID sebagai string
 
-if ($title === '') {
-    sendJsonResponse(400, ["status" => "error", "message" => "Field 'title' tidak boleh kosong."]);
-}
-
-// Prepare and execute
-$stmt = $conn->prepare("INSERT INTO tasks (project_id, title, status, story_points) VALUES (?, ?, ?, ?)");
-if ($stmt === false) {
-    sendJsonResponse(500, ["status" => "error", "message" => "Gagal menyiapkan statement: " . $conn->error]);
-}
-
-$bind = $stmt->bind_param("issi", $project_id, $title, $status, $story_points);
-if ($bind === false) {
-    $stmt->close();
-    sendJsonResponse(500, ["status" => "error", "message" => "Gagal bind parameter: " . $stmt->error]);
-}
-
-if ($stmt->execute()) {
-    $insert_id = $stmt->insert_id ?? $conn->insert_id;
-    $stmt->close();
-    $conn->close();
-    sendJsonResponse(201, ["status" => "success", "message" => "Tugas berhasil ditambahkan.", "id" => intval($insert_id)]);
-} else {
-    $err = $stmt->error ?: $conn->error;
-    $stmt->close();
-    $conn->close();
-    sendJsonResponse(500, ["status" => "error", "message" => "Gagal menambahkan tugas ke database: " . $err]);
+} catch (Exception $e) {
+    sendJsonResponse(500, ["status" => "error", "message" => "Gagal memasukkan tugas ke database: " . $e->getMessage()]);
+} finally {
+    if (isset($stmt)) $stmt->close();
+    if (isset($conn)) $conn->close();
 }
 ?>

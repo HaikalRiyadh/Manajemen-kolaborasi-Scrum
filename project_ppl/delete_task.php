@@ -1,61 +1,46 @@
 <?php
-// CORS & headers
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type");
-header('Content-Type: application/json');
+// 1. Include the central helper file.
+require_once __DIR__ . '/api_helpers.php';
 
-function sendJsonResponse($code, $data) {
-    http_response_code($code);
-    echo json_encode($data);
-    exit();
+// This endpoint only handles POST requests.
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    sendJsonResponse(405, ['status' => 'error', 'message' => 'Method Not Allowed']);
 }
 
-// Handle preflight
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    sendJsonResponse(200, ["status" => "ok"]);
+// 2. --- PROSES INPUT ---
+$data = $_POST;
+if (empty($data)) {
+    $inputJSON = file_get_contents('php://input');
+    $data = json_decode($inputJSON, TRUE) ?? [];
 }
 
-include 'db_connect.php'; // Memanggil file koneksi
+$task_id = isset($data['task_id']) ? trim(strval($data['task_id'])) : '';
 
-// Accept JSON or form data
-$contentType = $_SERVER['CONTENT_TYPE'] ?? '';
-if (stripos($contentType, 'application/json') !== false) {
-    $raw = file_get_contents('php://input');
-    $data = json_decode($raw, true);
-    if (!is_array($data)) {
-        sendJsonResponse(400, ["status" => "error", "message" => "Invalid JSON body."]);
+if ($task_id === '') {
+    sendJsonResponse(400, ["status" => "error", "message" => "Input 'task_id' wajib diisi."]);
+}
+
+// 3. --- OPERASI DATABASE ---
+try {
+    $stmt = $conn->prepare("DELETE FROM tasks WHERE id = ?");
+    if ($stmt === false) {
+        throw new Exception("Gagal menyiapkan statement: " . $conn->error);
     }
-} else {
-    $data = $_POST;
-}
 
-if (!isset($data['task_id'])) {
-    sendJsonResponse(400, ["status" => "error", "message" => "Task ID tidak dikirim."]);
-}
+    $stmt->bind_param("s", $task_id);
+    $stmt->execute();
 
-$task_id = intval($data['task_id']);
+    if ($stmt->affected_rows > 0) {
+        sendJsonResponse(200, ["status" => "success", "message" => "Tugas berhasil dihapus."]);
+    } else {
+        // ID tidak ditemukan, tapi ini bukan error server. Kirim respons sukses agar klien bisa refresh.
+        sendJsonResponse(200, ["status" => "success", "message" => "Tugas tidak ditemukan atau sudah dihapus."]);
+    }
 
-// Prepare and execute
-$stmt = $conn->prepare("DELETE FROM tasks WHERE id = ?");
-if ($stmt === false) {
-    sendJsonResponse(500, ["status" => "error", "message" => "Gagal menyiapkan statement: " . $conn->error]);
-}
-
-$bind = $stmt->bind_param("i", $task_id);
-if ($bind === false) {
-    $stmt->close();
-    sendJsonResponse(500, ["status" => "error", "message" => "Gagal bind parameter: " . $stmt->error]);
-}
-
-if ($stmt->execute()) {
-    $stmt->close();
-    $conn->close();
-    sendJsonResponse(200, ["status" => "success", "message" => "Tugas berhasil dihapus."]);
-} else {
-    $err = $stmt->error ?: $conn->error;
-    $stmt->close();
-    $conn->close();
-    sendJsonResponse(500, ["status" => "error", "message" => "Gagal menghapus tugas: " . $err]);
+} catch (Exception $e) {
+    sendJsonResponse(500, ["status" => "error", "message" => "Gagal menghapus tugas dari database: " . $e->getMessage()]);
+} finally {
+    if (isset($stmt)) $stmt->close();
+    if (isset($conn)) $conn->close();
 }
 ?>
