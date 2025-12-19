@@ -20,42 +20,50 @@ Aplikasi mobile berbasis **Flutter** untuk manajemen proyek Scrum yang kolaborat
 
 ---
 
-## 🚀 Panduan Instalasi Cepat
+## Langkah Instalasi
 
-Ikuti langkah-langkah ini secara berurutan agar aplikasi berjalan lancar.
+Ikuti langkah-langkah berikut untuk menjalankan proyek secara lokal.
 
-### 1️⃣ Persiapan Backend (Server & Database)
+### 1. Clone Repositori
 
-1.  **Salin API:**
-    Copy folder `project_ppl` dari proyek ini ke folder root server lokal Anda:
-    *   Laragon: `C:\laragon\www\project_ppl\`
-    *   XAMPP: `C:\xampp\htdocs\project_ppl\`
+Buka terminal atau command prompt, lalu jalankan:
 
-2.  **Setup Database:**
-    *   Buka **phpMyAdmin**.
-    *   Buat database baru bernama: **`lib_scrum_app`**.
-    *   Import file **`project_ppl/projects.sql`** ke database tersebut.
+```bash
+git clone https://github.com/HaikalRiyadh/Manajemen-kolaborasi-Scrum
+cd project
+```
 
-3.  **Cek Koneksi:**
-    Pastikan server Apache & MySQL sudah **Start**. Akses `http://localhost/project_ppl/` di browser. Jika tidak error 404, backend siap.
+### 2. Konfigurasi Backend (PHP Native)
 
-### 2️⃣ Persiapan Frontend (Mobile App)
+Salin folder API ke direktori root web server Anda:
 
-1.  **Install Dependensi:**
-    Buka terminal di folder `project/` dan jalankan:
-    ```bash
-    flutter pub get
-    ```
+*   **Laragon:** Pindahkan folder `project_ppl` ke `C:\laragon\www\`
+*   **XAMPP:** Pindahkan folder `project_ppl` ke `C:\xampp\htdocs\`
 
-2.  **Pilih Environment (PENTING!):**
-    *   🟢 **Emulator Android:** Langsung jalankan (Otomatis pakai IP `10.0.2.2`).
-    *   🟢 **Web/iOS Simulator:** Langsung jalankan (Otomatis pakai `localhost`).
-    *   ⚠️ **HP Fisik:** Edit IP di `lib/services/sprint_provider.dart` & `lib/screens/login_page.dart` ke IP LAN Laptop Anda (misal `192.168.1.x`).
+Setup Database:
 
-3.  **Jalankan Aplikasi:**
-    ```bash
-    flutter run
-    ```
+1.  Buka **phpMyAdmin** (`http://localhost/phpmyadmin`).
+2.  Buat database baru dengan nama: **`lib_scrum_app`**.
+3.  Import file database dari: `project_ppl/projects.sql`.
+
+### 3. Konfigurasi Frontend (Flutter)
+
+Masuk ke direktori project flutter, lalu instal dependensi:
+
+```bash
+flutter pub get
+```
+
+Sesuaikan konfigurasi IP (Jika perlu):
+
+*   **Emulator:** Tidak perlu ubah (Otomatis `10.0.2.2`).
+*   **HP Fisik:** Edit IP di `lib/services/sprint_provider.dart` ke IP Laptop Anda.
+
+Jalankan aplikasi:
+
+```bash
+flutter run
+```
 
 ---
 
@@ -63,10 +71,8 @@ Ikuti langkah-langkah ini secara berurutan agar aplikasi berjalan lancar.
 
 *   🔐 **Auth:** Register, Login, & Logout aman.
 *   👤 **Profil:** Lihat detail akun pengguna.
-*   📂 **Project:** mengelola sprint.
+*   📂 **Project:** Mengelola sprint.
 *   📊 **Scrum Board:** Kelola status task (To Do, In Progress, Done) & Story Points.
-
----
 
 ---
 
