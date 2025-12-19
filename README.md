@@ -63,18 +63,10 @@ Ikuti langkah-langkah ini secara berurutan agar aplikasi berjalan lancar.
 
 *   🔐 **Auth:** Register, Login, & Logout aman.
 *   👤 **Profil:** Lihat detail akun pengguna.
-*   📂 **Proyek Pribadi:** Data proyek terpisah antar user (Privat).
+*   📂 **Project:** mengelola sprint.
 *   📊 **Scrum Board:** Kelola status task (To Do, In Progress, Done) & Story Points.
 
 ---
-
-## ❓ FAQ & Troubleshooting
-
-| Masalah | Solusi |
-| :--- | :--- |
-| **Error "Format respons server salah"** | Pastikan server (Laragon/XAMPP) nyala. Pastikan folder `project_ppl` ada di `www` atau `htdocs`. |
-| **Daftar Proyek Kosong** | Normal untuk akun baru. Silakan buat proyek baru dulu. |
-| **Error 500 saat tambah proyek** | Update struktur database Anda. Pastikan tabel `projects` punya kolom `user_id`. Import ulang `projects.sql` jika ragu. |
 
 ---
 
