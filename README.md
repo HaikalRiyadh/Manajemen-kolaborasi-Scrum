@@ -70,7 +70,8 @@ flutter run
 ## ✨ Fitur Utama
 
 *   🔐 **Auth:** Register, Login, & Logout aman.
-*   👤 **Profil:** Lihat detail akun pengguna.
+*   ⚙️ **Settings:** Kelola akun dan pengaturan aplikasi.
+*   🔔 **Notifikasi:** Pemberitahuan aktivitas dan update proyek.
 *   📂 **Project:** Mengelola sprint.
 *   📊 **Scrum Board:** Kelola status task (To Do, In Progress, Done) & Story Points.
 
