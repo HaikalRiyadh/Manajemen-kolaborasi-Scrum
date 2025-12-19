@@ -1,86 +1,60 @@
+# Kelompok 3 - PPL PRAK I6
+
+**Anggota:**
+*   Haikal Riyadh Romadhon - 502510310005
+*   Tantri Pradipta Kusumawardani - 502510310007
+*   Deviani Trinita - 502510310008
+*   Jasmine Mumtaz - 502510310010
+
+---
+
 # Scrum Management App
 
-Aplikasi manajemen proyek Scrum berbasis mobile yang dibangun menggunakan **Flutter** (Frontend) dan **PHP Native** (Backend).
+Aplikasi manajemen proyek Scrum (Mobile) dengan backend PHP Native.
 
-## 📋 Prasyarat (Prerequisites)
+## 🛠 Teknologi
 
-Pastikan Anda telah menginstal software berikut di komputer Anda:
-1.  **Flutter SDK** (versi terbaru).
-2.  **Android Studio** atau **VS Code** (dengan ekstensi Flutter/Dart).
-3.  **Local Server** (XAMPP atau Laragon) yang menjalankan **Apache** dan **MySQL**.
-4.  **Git**.
+| Kategori | Teknologi |
+| :--- | :--- |
+| **Frontend** | Flutter (Dart) |
+| **Backend** | PHP Native |
+| **Database** | MySQL |
 
----
+## 📋 Prasyarat
 
-## ⚙️ Backend Setup (PHP & Database)
-
-Langkah ini penting agar aplikasi bisa berkomunikasi dengan server dan database.
-
-### 1. Pindahkan Folder API
-Salin folder `project_ppl` yang ada di dalam proyek ini ke dalam folder root server lokal Anda.
-*   **Laragon:** `C:\laragon\www\`
-
-Struktur akhirnya harus seperti ini:
-`C:\laragon\www\project_ppl\` atau `http://localhost/project_ppl/`
-
-### 2. Setup Database
-1.  Buka **phpMyAdmin** atau Database Manager (HeidiSQL).
-2.  Buat database baru dengan nama: **`lib_scrum_app`**.
-3.  Import file database yang telah disediakan:
-    *   File terletak di: `project_ppl/projects.sql`.
-    *   Jalankan file tersebut untuk membuat tabel `users`, `projects`, dan `tasks`.
-
-### 3. Konfigurasi Koneksi (Opsional)
-Jika Anda menggunakan username/password database selain default (`root` / kosong), edit file:
-`project_ppl/api_helpers.php`
-
-```php
-$servername = "127.0.0.1";
-$username_db = "root"; 
-$password_db = "";     
-$dbname = "lib_scrum_app";
-```
+1.  Flutter SDK & Android Studio/VS Code.
+2.  Local Server (Laragon/XAMPP) dengan MySQL & Apache.
+3.  Git.
 
 ---
 
-## 📱 Mobile App Setup (Flutter)
+## ⚙️ Setup Backend
 
-### 1. Install Dependencies
-Buka terminal di root folder proyek Flutter, lalu jalankan:
-
-```bash
-flutter pub get
-```
-
-### 2. Konfigurasi URL API
-Aplikasi ini sudah dikonfigurasi untuk mendeteksi lingkungan secara otomatis (Web vs Android Emulator).
-*   **Android Emulator:** Menggunakan `10.0.2.2` (IP loopback khusus emulator).
-*   **Web / iOS Simulator:** Menggunakan `localhost`.
-
-Jika Anda menggunakan **Device Asli (Fisik)**, Anda perlu mengubah URL di `lib/services/sprint_provider.dart` dan `lib/screens/login_page.dart` menggunakan alamat IP LAN komputer Anda (contoh: `192.168.1.x`).
-
-### 3. Jalankan Aplikasi
-Pastikan emulator sudah berjalan atau device terhubung via USB.
-
-```bash
-flutter run
-```
+1.  **Pindahkan API:** Salin folder `project_ppl` ke `C:\laragon\www\` (Laragon) atau `C:\xampp\htdocs\` (XAMPP).
+2.  **Database:**
+    *   Buat DB baru: **`lib_scrum_app`**.
+    *   Import: `project_ppl/projects.sql`.
+3.  **Config DB:** Edit `project_ppl/api_helpers.php` jika user/pass MySQL bukan default (`root`/kosong).
 
 ---
 
-## 🛠 Troubleshooting
+## 📱 Setup Frontend
 
-**1. Error "Format respons server salah" / "Connection Refused"**
-*   Pastikan Apache dan MySQL di XAMPP/Laragon sudah **Start**.
-*   Pastikan nama database di phpMyAdmin adalah `lib_scrum_app`.
-*   Jika menggunakan Emulator, pastikan bisa mengakses `http://10.0.2.2/project_ppl/get_all_data.php` dari browser emulator.
-
-**2. Login Gagal / Proyek Kosong**
-*   Saat pertama kali install, tabel `projects` kosong. Register akun baru, login, lalu buat proyek baru.
+1.  **Install:**
+    ```bash
+    flutter pub get
+    ```
+2.  **Config API:**
+    *   **Emulator:** `10.0.2.2` (Default).
+    *   **Fisik:** Edit IP di `lib/services/sprint_provider.dart` & `lib/screens/login_page.dart`.
+3.  **Run:**
+    ```bash
+    flutter run
+    ```
 
 ---
 
-## 📂 Struktur Folder
-*   `lib/` - Kode utama Flutter (UI & Logika).
-*   `project_ppl/` - Kode Backend PHP (API).
-*   `project_ppl/projects.sql` - Skema Database.
+## 📂 Direktori
+
+*   `lib/`: Kode Flutter.
+*   `project_ppl/`: Backend PHP & SQL.
