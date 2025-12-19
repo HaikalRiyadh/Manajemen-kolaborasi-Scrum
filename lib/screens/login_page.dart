@@ -1,7 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 import 'dart:convert';
 
+import '../services/sprint_provider.dart';
 import '../screens/register_page.dart';
 import 'home_page.dart';
 import '../widgets/custom_input.dart';
@@ -19,15 +22,8 @@ class _LoginPageState extends State<LoginPage> {
   bool _isLoading = false;
 
   Future<void> login() async {
-    // === PERBAIKAN START ===
-    // Username di trim karena umumya tidak boleh mengandung spasi di awal/akhir
     final username = usernameController.text.trim();
-
-    // Password TIDAK di trim, karena spasi adalah bagian dari password
-    // Jika di trim, verifikasi password_verify() di PHP akan gagal
     final password = passwordController.text;
-    // === PERBAIKAN END ===
-
 
     if (username.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -40,8 +36,8 @@ class _LoginPageState extends State<LoginPage> {
       _isLoading = true;
     });
 
-    // Menggunakan IP Android Emulator untuk koneksi ke Laragon
-    final url = Uri.parse('http://localhost/project_ppl/login.php');
+    final String baseUrl = kIsWeb ? 'http://localhost/project_ppl' : 'http://10.0.2.2/project_ppl';
+    final url = Uri.parse('$baseUrl/login.php');
 
     try {
       final response = await http.post(
@@ -54,46 +50,57 @@ class _LoginPageState extends State<LoginPage> {
 
       if (!mounted) return;
 
-      // Cek status code
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = jsonDecode(response.body);
 
         if (data['status'] == 'success') {
+          // --- SIMPAN DATA USER LENGKAP ---
+          final int userId = int.parse(data['data']['id'].toString());
+          final String username = data['data']['username'];
+          final String fullName = data['data']['full_name'];
+          
+          // Simpan ke SprintProvider agar bisa dipakai di halaman Account
+          Provider.of<SprintProvider>(context, listen: false).setUserData(userId, username, fullName);
+
           // Navigasi ke halaman utama
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => const HomePage()),
           );
         } else {
-          // Tampilkan pesan error dari PHP
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(data['message'] ?? "Login gagal")),
           );
         }
       }
-      // Tambahkan penanganan untuk kode error 400 & 401 (dari PHP)
       else if (response.statusCode == 400 || response.statusCode == 401 || response.statusCode == 404) {
-        final Map<String, dynamic> data = jsonDecode(response.body);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data['message'] ?? "Autentikasi gagal. Coba lagi.")),
-        );
+        try {
+          final Map<String, dynamic> data = jsonDecode(response.body);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(data['message'] ?? "Autentikasi gagal.")),
+          );
+        } catch (_) {
+           ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Username atau password salah.")),
+          );
+        }
       }
       else {
-        // Tampilkan error server lainnya (misalnya 500)
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Server error: ${response.statusCode}")),
         );
       }
     } catch (e) {
       if (!mounted) return;
-      // Pesan error jika tidak bisa terhubung sama sekali (Network Error)
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Gagal terhubung ke server (Cek koneksi & Laragon): $e")),
+        SnackBar(content: Text("Gagal terhubung ke server: $e")),
       );
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 

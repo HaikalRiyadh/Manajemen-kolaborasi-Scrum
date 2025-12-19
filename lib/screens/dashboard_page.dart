@@ -47,7 +47,7 @@ class _DashboardPageState extends State<DashboardPage> {
               onRefresh: () => sprintProvider.fetchProjects(), // Cukup panggil fetchProjects
               child: ListView.builder(
                 padding: const EdgeInsets.all(16.0),
-                itemCount: activeProjects.length + 1, // +1 for header
+                itemCount: activeProjects.length + 1, // +1 untuk header
                 itemBuilder: (context, index) {
                   if (index == 0) {
                     return _buildHeader(context, headerStyle);
@@ -135,7 +135,13 @@ class BurndownChartCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${project.name} - (Sprint ${project.currentSprint}/${project.sprint})', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(project.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                Text('Sprint Saat Ini: ${project.currentSprint}', style: const TextStyle(fontSize: 14, color: Colors.black54)),
+              ],
+            ),
             const Divider(height: 24),
             Text('Burndown Chart', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             const SizedBox(height: 20),
@@ -177,24 +183,26 @@ class BurndownChartCard extends StatelessWidget {
               ),
             ),
           ),
-          borderData: FlBorderData(show: true, border: Border.all(color: Colors.black26, width: 1)),
+          borderData: FlBorderData(show: false),
           lineBarsData: [
             // Garis Estimasi (Ideal)
             LineChartBarData(
               spots: data.map((d) => FlSpot(d.sprint.toDouble(), d.estimated.toDouble())).toList(),
               isCurved: false,
-              color: Colors.blue,
+              color: Colors.purple.withOpacity(0.5),
               barWidth: 2,
+              isStrokeCapRound: true,
               dotData: const FlDotData(show: false),
+              dashArray: [5, 5],
             ),
             // Garis Aktual
             LineChartBarData(
               spots: data.map((d) => FlSpot(d.sprint.toDouble(), d.actual.toDouble())).toList(),
-              isCurved: true,
-              color: Colors.red,
+              isCurved: false,
+              color: Colors.purple,
               barWidth: 3,
+              isStrokeCapRound: true,
               dotData: const FlDotData(show: true),
-              belowBarData: BarAreaData(show: true, color: Colors.red.withOpacity(0.2)),
             ),
           ],
           gridData: const FlGridData(
@@ -210,7 +218,6 @@ class BurndownChartCard extends StatelessWidget {
 
   Widget _bottomTitleWidgets(double value, TitleMeta meta, int totalSprints) {
     const style = TextStyle(fontSize: 10, color: Colors.black87, fontWeight: FontWeight.bold);
-    // Atur interval agar tidak terlalu padat
     int interval = (totalSprints / 5).ceil();
     if (value.toInt() % interval == 0 || value.toInt() == totalSprints) {
       return SideTitleWidget(axisSide: meta.axisSide, space: 4, child: Text('S${value.toInt()}', style: style));
@@ -220,19 +227,13 @@ class BurndownChartCard extends StatelessWidget {
 
   Widget _leftTitleWidgets(double value, TitleMeta meta, double calculatedMaxY) {
     const style = TextStyle(fontSize: 10, color: Colors.black54);
-    // Atur interval agar tidak terlalu padat
-    double interval = (calculatedMaxY / 4);
-    if (interval > 0 && value % interval == 0) {
+    double interval = (calculatedMaxY / 4).ceilToDouble();
+    if (interval > 0 && (value % interval == 0 || value == calculatedMaxY)) {
       return SideTitleWidget(
         axisSide: meta.axisSide,
         space: 4,
         child: Text('${value.toInt()} pts', style: style, textAlign: TextAlign.center),
       );
-    } else if (value == calculatedMaxY) {
-        return SideTitleWidget(
-            axisSide: meta.axisSide,
-            space: 4,
-            child: Text('${value.toInt()} pts', style: style, textAlign: TextAlign.center));
     }
     return Container();
   }

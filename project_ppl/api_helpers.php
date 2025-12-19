@@ -1,9 +1,11 @@
 <?php
 // api_helpers.php
 
-// --- STRATEGI PENANGANAN ERROR PALING TANGGUH ---
+// Matikan display error agar tidak merusak format JSON
+ini_set('display_errors', 0);
+error_reporting(E_ALL);
 
-// 1. Mulai output buffering untuk menangkap semua output liar
+// 1. Mulai output buffering
 ob_start();
 
 // 2. Set error handler kustom
@@ -14,11 +16,13 @@ set_error_handler(function($severity, $message, $file, $line) {
     throw new ErrorException($message, 0, $severity, $file, $line);
 });
 
-// 3. Fungsi untuk mengirim respons JSON yang dijamin bersih
+// 3. Fungsi untuk mengirim respons JSON
 function sendJsonResponse($status_code, $data) {
+    // Bersihkan buffer output agar tidak ada teks lain yang terkirim
     if (ob_get_length()) {
-        ob_end_clean();
+        ob_clean(); 
     }
+    
     // Hanya set header jika tidak berjalan di CLI
     if (php_sapi_name() !== 'cli') {
         http_response_code($status_code);
@@ -28,43 +32,46 @@ function sendJsonResponse($status_code, $data) {
     exit();
 }
 
-// 4. Set exception handler global sebagai lapisan pertahanan terakhir
+// 4. Set exception handler global
 set_exception_handler(function($exception) {
     sendJsonResponse(500, [
         'status' => 'error',
         'message' => 'An unhandled exception occurred.',
         'detail' => [
             'error_message' => $exception->getMessage(),
-            'file' => $exception->getFile(),
-            'line' => $exception->getLine(),
         ]
     ]);
 });
 
-// 5. HEADERS, CORS, & PREFLIGHT REQUEST
-// Hanya jalankan ini jika tidak dalam mode CLI
+// 5. HEADERS, CORS
 if (php_sapi_name() !== 'cli') {
     header("Access-Control-Allow-Origin: *");
     header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
     header("Access-Control-Allow-Headers: Content-Type");
 
-    // PERBAIKAN: Cek apakah REQUEST_METHOD ada sebelum digunakan
     if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
         sendJsonResponse(200, ["status" => "ok"]);
     }
 }
 
-
 // 6. KONEKSI DATABASE
 $servername = "127.0.0.1";
 $username_db = "root";
 $password_db = "";
-$dbname = "lib_scrum_app"; // PERBAIKAN: Nama database dikembalikan sesuai gambar
+$dbname = "lib_scrum_app";
 
-$conn = new mysqli($servername, $username_db, $password_db, $dbname);
-if ($conn->connect_error) {
-    throw new Exception("Database connection failed: " . $conn->connect_error);
+// Gunakan try-catch khusus untuk koneksi awal
+try {
+    $conn = new mysqli($servername, $username_db, $password_db, $dbname);
+    if ($conn->connect_error) {
+        throw new Exception("Database connection failed: " . $conn->connect_error);
+    }
+    $conn->set_charset("utf8mb4");
+} catch (Exception $e) {
+    sendJsonResponse(500, [
+        'status' => 'error', 
+        'message' => 'Gagal koneksi database. Pastikan database lib_scrum_app ada.',
+        'detail' => $e->getMessage()
+    ]);
 }
-$conn->set_charset("utf8mb4");
-
-?>
+// File PHP murni sebaiknya TIDAK diakhiri dengan tag penutup PHP untuk mencegah output whitespace tidak sengaja

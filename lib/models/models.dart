@@ -1,15 +1,15 @@
-// File: lib/models/models.dart
+// Berkas: lib/models/models.dart
+import 'dart:math';
 
-// Enum untuk status tugas
 enum TaskStatus { backlog, toDo, inProgress, done }
 
-// Model untuk sebuah tugas (task)
 class ScrumTask {
   final String id;
   String title;
   TaskStatus status;
   final int storyPoints;
-  int? completionDay; // Menyimpan informasi sprint ke berapa tugas ini selesai
+  int? completionDay;
+  int? assignedSprint;
 
   ScrumTask({
     required this.id,
@@ -17,6 +17,7 @@ class ScrumTask {
     this.status = TaskStatus.backlog,
     required this.storyPoints,
     this.completionDay,
+    this.assignedSprint,
   });
 
   factory ScrumTask.fromJson(Map<String, dynamic> json) {
@@ -29,61 +30,53 @@ class ScrumTask {
       title: json['title'],
       status: status,
       storyPoints: int.tryParse(json['story_points'].toString()) ?? 0,
-      // Backend akan mengirim 'completion_sprint'
       completionDay: json['completion_sprint'] != null
           ? int.tryParse(json['completion_sprint'].toString())
+          : null,
+      assignedSprint: json['assigned_sprint'] != null
+          ? int.tryParse(json['assigned_sprint'].toString())
           : null,
     );
   }
 }
 
-// Model untuk setiap proyek
 class Project {
   final int id;
   final String name;
-  final int sprint; // Total durasi sprint
-  int currentSprint;  // Sprint yang sedang berjalan
+  final int sprint;
   List<ScrumTask> tasks;
 
   Project({
     required this.id,
     required this.name,
     required this.sprint,
-    required this.currentSprint,
     this.tasks = const [],
   });
 
-  // Getter untuk menghitung progres secara dinamis berdasarkan story points dan status
+  int get currentSprint {
+    if (tasks.isEmpty) return 1;
+    final highestSprint = tasks
+        .map((task) => task.assignedSprint ?? 0)
+        .fold(0, (prev, current) => max(prev, current));
+    return highestSprint > 0 ? highestSprint : 1;
+  }
+
+  // Mengubah perhitungan progress agar konsisten dengan burndown chart
   int get progress {
-    if (tasks.isEmpty) {
-      return 0;
-    }
+    if (tasks.isEmpty) return 0;
+
     final totalStoryPoints = tasks.fold<int>(0, (sum, task) => sum + task.storyPoints);
     if (totalStoryPoints == 0) {
       return tasks.every((task) => task.status == TaskStatus.done) ? 100 : 0;
     }
 
-    double weightedProgress = 0;
-    for (var task in tasks) {
-      double statusWeight;
-      switch (task.status) {
-        case TaskStatus.backlog:
-          statusWeight = 0;      // 0%
-          break;
-        case TaskStatus.toDo:
-          statusWeight = 0.25;   // 25%
-          break;
-        case TaskStatus.inProgress:
-          statusWeight = 0.75;   // 75%
-          break;
-        case TaskStatus.done:
-          statusWeight = 1.0;    // 100%
-          break;
-      }
-      weightedProgress += task.storyPoints * statusWeight;
-    }
+    // Hitung story points dari tugas yang sudah berstatus 'done'
+    final doneStoryPoints = tasks
+        .where((task) => task.status == TaskStatus.done)
+        .fold<int>(0, (sum, task) => sum + task.storyPoints);
 
-    return ((weightedProgress / totalStoryPoints) * 100).round();
+    // Kembalikan persentase progress
+    return ((doneStoryPoints / totalStoryPoints) * 100).round();
   }
 
   factory Project.fromJson(Map<String, dynamic> json) {
@@ -93,14 +86,11 @@ class Project {
       id: int.parse(json['id'].toString()),
       name: json['name'],
       sprint: int.parse(json['sprint'].toString()),
-      // Ambil 'current_sprint' dari JSON, default-nya 1 jika tidak ada
-      currentSprint: int.tryParse(json['current_sprint']?.toString() ?? '1') ?? 1,
       tasks: tasksData,
     );
   }
 }
 
-// Model untuk data burndown chart
 class BurndownData {
   final int sprint;
   final int estimated;

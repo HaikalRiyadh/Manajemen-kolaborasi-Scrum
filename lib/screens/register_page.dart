@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'; // Diperlukan untuk kIsWeb
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../widgets/custom_input.dart';
 import '../screens/login_page.dart';
-import 'home_page.dart'; // Tambahkan jika Anda ingin navigasi ke home setelah login
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -13,21 +13,17 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
-  // nameController akan digunakan untuk full_name (nama lengkap)
   final TextEditingController nameController = TextEditingController();
-  // emailController akan digunakan untuk username, sesuai dengan kebutuhan skrip
   final TextEditingController usernameController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   final TextEditingController confirmPasswordController = TextEditingController();
   bool _isLoading = false;
 
   Future<void> register() async {
-    // Ambil nilai dari controller
     final username = usernameController.text.trim();
-    final password = passwordController.text; // TIDAK di trim
+    final password = passwordController.text;
     final full_name = nameController.text.trim();
 
-    // Validasi di sisi client
     if (full_name.isEmpty ||
         username.isEmpty ||
         password.isEmpty ||
@@ -49,53 +45,92 @@ class _RegisterPageState extends State<RegisterPage> {
       _isLoading = true;
     });
 
-    // === PERBAIKAN URL UNTUK EMULATOR ===
-    // Menggunakan IP 10.0.2.2 untuk terhubung ke Laragon (localhost)
-    final url = Uri.parse('http://localhost/project_ppl/register.php');
+    final String baseUrl = kIsWeb ? 'http://localhost/project_ppl' : 'http://10.0.2.2/project_ppl';
+    final url = Uri.parse('$baseUrl/register.php');
 
     try {
       final response = await http.post(
         url,
         body: {
-          // === PERBAIKAN MAPPING DATA (SESUAIKAN DENGAN register.php) ===
-          'username': username,          // Mengirim username
-          'password': password,          // Mengirim password
-          'full_name': full_name,        // Mengirim full_name (dari nameController)
+          'username': username,
+          'password': password,
+          'full_name': full_name,
         },
       );
 
       if (!mounted) return;
 
-      // Penanganan kode status
-      if (response.statusCode == 200 || response.statusCode == 400 || response.statusCode == 409) {
-        final responseData = jsonDecode(response.body);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        try {
+           final responseData = jsonDecode(response.body);
+           
+           if (responseData['status'] == 'success') {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Registrasi berhasil! Silakan login.")),
+              );
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginPage()),
+              );
+           } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(responseData['message'] ?? "Registrasi gagal.")),
+              );
+           }
+        } catch (e) {
+           // TAMPILKAN PESAN ERROR DARI SERVER LANGSUNG KE PENGGUNA UNTUK DEBUGGING
+           // Ambil 200 karakter pertama dari respons untuk ditampilkan
+           String serverError = response.body.length > 200 
+               ? response.body.substring(0, 200) + "..." 
+               : response.body;
+           
+           if (serverError.isEmpty) serverError = "Respon kosong dari server.";
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(responseData['message'])),
-        );
-
-        if (responseData['status'] == 'success') {
-          // Kembali ke halaman login setelah registrasi berhasil
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const LoginPage()),
-          );
+           showDialog(
+             context: context,
+             builder: (ctx) => AlertDialog(
+               title: const Text("Format Respons Server Salah"),
+               content: SingleChildScrollView(
+                 child: Text("Server tidak mengembalikan JSON yang valid.\n\nIsi respons:\n$serverError"),
+               ),
+               actions: [
+                 TextButton(
+                   onPressed: () => Navigator.of(ctx).pop(),
+                   child: const Text("Tutup"),
+                 )
+               ],
+             ),
+           );
         }
-      } else {
+      } 
+      else if (response.statusCode == 400 || response.statusCode == 409) {
+        try {
+          final responseData = jsonDecode(response.body);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(responseData['message'] ?? "Data tidak valid atau sudah ada.")),
+          );
+        } catch (_) {
+           ScaffoldMessenger.of(context).showSnackBar(
+             SnackBar(content: Text("Error ${response.statusCode}: ${response.body}")),
+           );
+        }
+      }
+      else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Server error: ${response.statusCode}. Cek file db_connect.php.")),
+          SnackBar(content: Text("Server error: ${response.statusCode}.")),
         );
       }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        // Memberikan pesan error yang lebih spesifik jika gagal fetch
-        SnackBar(content: Text("Gagal terhubung ke server (Network Error): ${e.toString()}. Cek Firewall & Cleartext Traffic.")),
+        SnackBar(content: Text("Gagal terhubung ke server: $e")),
       );
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -103,7 +138,6 @@ class _RegisterPageState extends State<RegisterPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        // Tombol kembali otomatis
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
@@ -118,24 +152,41 @@ class _RegisterPageState extends State<RegisterPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Mengubah peran controller
-              CustomInput(controller: nameController, hint: "Nama Lengkap", icon: Icons.person),
+              CustomInput(
+                controller: nameController, 
+                hint: "Nama Lengkap", 
+                icon: Icons.badge
+              ),
               const SizedBox(height: 20),
-              CustomInput(controller: usernameController, hint: "Nama Pengguna (Username)", icon: Icons.email),
+              CustomInput(
+                controller: usernameController, 
+                hint: "Nama Pengguna (Username)", 
+                icon: Icons.person
+              ),
               const SizedBox(height: 20),
-              CustomInput(controller: passwordController, hint: "Password", icon: Icons.lock, obscure: true),
+              CustomInput(
+                controller: passwordController, 
+                hint: "Password", 
+                icon: Icons.lock, 
+                obscure: true
+              ),
               const SizedBox(height: 20),
-              CustomInput(controller: confirmPasswordController, hint: "Konfirmasi Password", icon: Icons.lock, obscure: true),
+              CustomInput(
+                controller: confirmPasswordController, 
+                hint: "Konfirmasi Password", 
+                icon: Icons.lock_outline, 
+                obscure: true
+              ),
               const SizedBox(height: 30),
               _isLoading
                   ? const CircularProgressIndicator()
                   : ElevatedButton(
-                onPressed: register,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15),
-                ),
-                child: const Text("Register"),
-              ),
+                      onPressed: register,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15),
+                      ),
+                      child: const Text("Register"),
+                    ),
               const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,

@@ -1,43 +1,49 @@
 <?php
-// 1. Include the central helper file.
 require_once __DIR__ . '/api_helpers.php';
 
-// 2. This script should only handle POST requests for adding a project.
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // --- PROCESS INSERT PROJECT ---
     $data = $_POST;
     if (empty($data)) {
         $inputJSON = file_get_contents('php://input');
         $data = json_decode($inputJSON, TRUE) ?? [];
     }
 
-    // Read 'name' and 'sprint' from the request
     $name = $data['name'] ?? '';
-    $sprint_str = $data['sprint'] ?? '0'; // Baca sebagai string
+    $sprint_str = $data['sprint'] ?? '0'; 
+    $user_id = isset($data['user_id']) ? intval($data['user_id']) : 0;
 
-    // Validasi input
     if (empty(trim($name))) {
         sendJsonResponse(400, ["status" => "error", "message" => "Field 'name' wajib diisi"]);
     }
-    if (!is_numeric($sprint_str) || intval($sprint_str) <= 0) {
-        sendJsonResponse(400, ["status" => "error", "message" => "Field 'sprint' harus berupa angka positif"]);
+    if ($user_id <= 0) {
+        sendJsonResponse(400, ["status" => "error", "message" => "User ID tidak valid. Silakan login ulang."]);
     }
 
-    // Konversi sprint ke integer SETELAH validasi
     $sprint_int = intval($sprint_str);
+    if ($sprint_int <= 0) $sprint_int = 1; 
 
-    // The global handler in api_helpers.php will catch any database errors.
-        $stmt = $conn->prepare("INSERT INTO projects (name, sprint) VALUES (?, ?)");
-    $stmt->bind_param('si', $name, $sprint_int); // Pastikan variabel kedua adalah $sprint_int
+    // Debugging: Cek apakah prepare berhasil
+    $stmt = $conn->prepare("INSERT INTO projects (user_id, name, sprint) VALUES (?, ?, ?)");
     
-    $stmt->execute();
-    $insert_id = $conn->insert_id;
+    if (!$stmt) {
+        // Kemungkinan besar kolom user_id belum ada di database
+        sendJsonResponse(500, [
+            "status" => "error", 
+            "message" => "Gagal menyiapkan query database. Kemungkinan struktur tabel belum diupdate (kolom user_id hilang). Error: " . $conn->error
+        ]);
+    }
+
+    $stmt->bind_param('isi', $user_id, $name, $sprint_int);
+    
+    if ($stmt->execute()) {
+        $insert_id = $conn->insert_id;
+        sendJsonResponse(201, ["status" => "success", "message" => "Project berhasil dibuat", "id" => intval($insert_id)]);
+    } else {
+        sendJsonResponse(500, ["status" => "error", "message" => "Gagal membuat project: " . $stmt->error]);
+    }
     $stmt->close();
 
-    sendJsonResponse(201, ["status" => "success", "message" => "Project berhasil dibuat", "id" => intval($insert_id)]);
-
 } else {
-    // Method Not Allowed. This endpoint is only for creating projects.
-    sendJsonResponse(405, ["status" => "error", "message" => "Method not allowed. Use POST to create a project."]);
+    sendJsonResponse(405, ["status" => "error", "message" => "Method not allowed."]);
 }
-?>
+// Tidak ada tag penutup PHP

@@ -10,10 +10,28 @@ class SprintProvider with ChangeNotifier {
   List<Project> _projects = [];
   bool _isLoading = false;
   String? _errorMessage;
+  
+  // Data User
+  int? _userId;
+  String? _username;
+  String? _fullName;
 
   List<Project> get projects => _projects;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  
+  // Getter untuk data user
+  int? get userId => _userId;
+  String? get username => _username;
+  String? get fullName => _fullName;
+
+  // Fungsi untuk menyimpan data user saat login
+  void setUserData(int id, String username, String fullName) {
+    _userId = id;
+    _username = username;
+    _fullName = fullName;
+    notifyListeners();
+  }
 
   void _setLoading(bool loading) {
     _isLoading = loading;
@@ -30,12 +48,13 @@ class SprintProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // ... (fetchProjects, addProject, fetchProjectDetails - tidak ada perubahan signifikan)
   Future<void> fetchProjects() async {
+    if (_userId == null) return;
+    
     _setLoading(true);
     _setError(null);
     try {
-      final response = await http.get(Uri.parse('$_baseUrl/get_all_data.php'));
+      final response = await http.get(Uri.parse('$_baseUrl/get_all_data.php?user_id=$_userId'));
       if (response.statusCode == 200) {
         try {
           final responseData = json.decode(response.body);
@@ -43,14 +62,14 @@ class SprintProvider with ChangeNotifier {
             final List<dynamic> projectData = responseData['data'];
             _projects = projectData.map((json) => Project.fromJson(json)).toList();
           } else {
-            throw Exception(responseData['message'] ?? 'Gagal memuat data proyek');
+             _projects = [];
           }
         } on FormatException {
-          debugPrint('Server Response (Error): ${response.body}');
-          throw Exception('Respons dari server tidak valid. Kemungkinan ada error di sisi server.');
+          debugPrint('Respon Server (Error): ${response.body}');
+          throw Exception('Respons dari server tidak valid.');
         }
       } else {
-        throw Exception('Server returned error: ${response.statusCode}');
+        throw Exception('Server mengembalikan error: ${response.statusCode}');
       }
     } catch (e) {
       _setError("Gagal memuat proyek: ${e.toString().replaceAll('Exception: ', '')}");
@@ -60,25 +79,31 @@ class SprintProvider with ChangeNotifier {
   }
 
   Future<void> addProject(String name, String sprint) async {
+    if (_userId == null) {
+      _setError("User belum login");
+      return;
+    }
+
     _setLoading(true);
     _setError(null);
     try {
-      final response = await http.post(Uri.parse('$_baseUrl/add_project.php'), body: {'name': name, 'sprint': sprint});
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        try {
-          final responseData = json.decode(response.body);
-          if (responseData['status'] == 'success') {
-            await fetchProjects();
-          } else {
-            throw Exception(responseData['message'] ?? 'Gagal menambah proyek di server');
+      final response = await http.post(
+          Uri.parse('$_baseUrl/add_project.php'), 
+          body: {
+            'name': name, 
+            'sprint': sprint,
+            'user_id': _userId.toString()
           }
-        } on FormatException {
-            debugPrint('Server Response (addProject Error): ${response.body}');
-            throw Exception('Respons tidak valid dari server saat menambah proyek.');
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final responseData = json.decode(response.body);
+        if (responseData['status'] == 'success') {
+          await fetchProjects();
+        } else {
+          throw Exception(responseData['message'] ?? 'Gagal menambah proyek.');
         }
       } else {
-          // PERBAIKAN: Tampilkan body respons saat terjadi error 500
-          throw Exception('Gagal menambah proyek di server (Error: ${response.statusCode}). Response: ${response.body}');
+          throw Exception('Gagal menambah proyek (Error: ${response.statusCode}).');
       }
     } catch (e) {
       _setError("Gagal menambah proyek: ${e.toString().replaceAll('Exception: ', '')}");
@@ -87,115 +112,56 @@ class SprintProvider with ChangeNotifier {
     }
   }
   
-    Future<void> updateTaskStatus(ScrumTask task, TaskStatus newStatus, int projectId, int currentSprint) async {
+  Future<void> updateTaskStatus(ScrumTask task, TaskStatus newStatus, int projectId, int sprintNumber) async {
     final projectIndex = _projects.indexWhere((p) => p.id == projectId);
     if (projectIndex == -1) return;
 
     final taskIndex = _projects[projectIndex].tasks.indexWhere((t) => t.id == task.id);
     if (taskIndex == -1) return;
 
-    final oldStatus = _projects[projectIndex].tasks[taskIndex].status;
-    _projects[projectIndex].tasks[taskIndex].status = newStatus;
+    final targetTask = _projects[projectIndex].tasks[taskIndex];
+    final oldStatus = targetTask.status;
+    final oldAssignedSprint = targetTask.assignedSprint;
+    final oldCompletionDay = targetTask.completionDay;
 
-    // Jika tugas ditandai 'Done', catat sprint penyelesaiannya
-    int? completionSprint = (newStatus == TaskStatus.done) ? currentSprint : null;
-    _projects[projectIndex].tasks[taskIndex].completionDay = completionSprint;
-    notifyListeners();
+    targetTask.status = newStatus;
+    targetTask.assignedSprint = sprintNumber;
 
-    _setError(null);
-    try {
-        final response = await http.post(
-            Uri.parse('$_baseUrl/update_task_status.php'),
-            body: {
-                'task_id': task.id,
-                'new_status': newStatus.name,
-                // Kirim sprint saat ini jika tugas sudah selesai
-                if (completionSprint != null) 'completion_sprint': completionSprint.toString(),
-            },
-        );
-
-        final responseData = json.decode(response.body);
-        if (responseData['status'] != 'success') {
-            throw Exception(responseData['message'] ?? 'Gagal update di server');
-        }
-        await fetchProjects(); // Sinkronkan data setelah berhasil
-    } catch (e) {
-        _setError("Gagal update status: ${e.toString().replaceAll('Exception: ', '')}");
-        // Rollback jika gagal
-        _projects[projectIndex].tasks[taskIndex].status = oldStatus;
-        _projects[projectIndex].tasks[taskIndex].completionDay = (oldStatus == TaskStatus.done) ? currentSprint : null;
-        notifyListeners();
+    if (newStatus == TaskStatus.done) {
+      targetTask.completionDay = sprintNumber;
+    } else {
+      targetTask.completionDay = null;
     }
-}
 
-
-  Future<void> completeSprint(int projectId) async {
-    _setLoading(true);
+    notifyListeners();
     _setError(null);
+
     try {
+      final body = <String, String>{
+        'task_id': task.id,
+        'new_status': newStatus.name,
+        'assigned_sprint': sprintNumber.toString(),
+      };
+
+      if (targetTask.completionDay != null) {
+        body['completion_sprint'] = targetTask.completionDay.toString();
+      }
+
       final response = await http.post(
-        Uri.parse('$_baseUrl/complete_sprint.php'),
-        body: {'project_id': projectId.toString()},
+        Uri.parse('$_baseUrl/update_task_status.php'),
+        body: body,
       );
 
-      if (response.statusCode == 200) {
-        final responseData = json.decode(response.body);
-        if (responseData['status'] == 'success') {
-          await fetchProjects(); // Refresh data untuk mendapatkan sprint baru dan status tugas
-        } else {
-          throw Exception(responseData['message'] ?? 'Gagal menyelesaikan sprint');
-        }
-      } else {
-        throw Exception('Error: ${response.statusCode} - ${response.body}');
-      }
-    } catch (e) {
-      _setError("Gagal menyelesaikan sprint: ${e.toString().replaceAll('Exception: ', '')}");
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  // ... (sisa metode lainnya: deleteTask, fetchAllProjectData, generateBurndownData)
-  Future<void> deleteTask(String taskId, int projectId) async {
-    _setError(null);
-    try {
-      final response = await http.post(Uri.parse('$_baseUrl/delete_task.php'), body: {
-        'task_id': taskId,
-      });
       final responseData = json.decode(response.body);
       if (responseData['status'] != 'success') {
-        throw Exception('Gagal menghapus tugas di server');
-      }
-      await fetchProjects();
-    } catch (e) {
-      _setError("Gagal menghapus tugas: ${e.toString().replaceAll('Exception: ', '')}");
-    }
-  }
-
-  List<Project> _projectsWithTasks = [];
-  List<Project> get projectsWithTasks => _projectsWithTasks;
-
-  Future<void> fetchAllProjectData() async {
-    _setLoading(true);
-    _setError(null);
-    try {
-      final response = await http.get(Uri.parse('$_baseUrl/get_all_data.php'));
-      try {
-        final responseData = json.decode(response.body);
-        if (responseData['status'] == 'success') {
-          final List<dynamic> projectData = responseData['data'];
-          _projectsWithTasks = projectData.map((json) => Project.fromJson(json)).toList();
-        } else {
-          throw Exception(responseData['message'] ?? 'Failed to load data');
-        }
-      } on FormatException {
-        debugPrint('Server Response (Error): ${response.body}');
-        throw Exception('Respons dari server tidak valid. Periksa kembali sisi server.');
+        throw Exception(responseData['message'] ?? 'Gagal update di server');
       }
     } catch (e) {
-      _setError("Error fetching all data: ${e.toString().replaceAll('Exception: ', '')}");
-    } finally {
-      _setLoading(false);
+      _setError("Gagal update status: ${e.toString().replaceAll('Exception: ', '')}");
+      targetTask.status = oldStatus;
+      targetTask.assignedSprint = oldAssignedSprint;
+      targetTask.completionDay = oldCompletionDay;
+      notifyListeners();
     }
   }
 
@@ -205,32 +171,59 @@ class SprintProvider with ChangeNotifier {
     }
 
     final totalStoryPoints = project.tasks.fold<int>(0, (sum, task) => sum + task.storyPoints);
-    // Jika tidak ada story points, tidak ada yang bisa di-burndown
     if (totalStoryPoints == 0) return [];
 
-    final idealPointsPerDay = totalStoryPoints / project.sprint;
+    final idealPointsPerSprint = totalStoryPoints / project.sprint;
 
     List<BurndownData> burndownData = [];
+    
     for (int sprint = 0; sprint <= project.sprint; sprint++) {
-      final estimated = totalStoryPoints - (sprint * idealPointsPerDay);
-
-      // Hitung story points yang sudah selesai pada atau sebelum sprint ini
-      final completedStoryPoints = project.tasks
-          .where((task) => task.status == TaskStatus.done && task.completionDay != null && task.completionDay! <= sprint)
-          .fold<int>(0, (sum, task) => sum + task.storyPoints);
+      final estimated = totalStoryPoints - (sprint * idealPointsPerSprint);
       
-      final actual = totalStoryPoints - completedStoryPoints;
+      int storyPointsDone = 0;
+      for (final task in project.tasks) {
+        if (task.completionDay != null && task.completionDay! <= sprint) {
+          storyPointsDone += task.storyPoints;
+        }
+      }
+
+      final actual = totalStoryPoints - storyPointsDone;
 
       burndownData.add(BurndownData(
         sprint: sprint,
-        estimated: estimated.round(),
-        actual: actual,
+        estimated: estimated.round().clamp(0, totalStoryPoints),
+        actual: actual.clamp(0, totalStoryPoints),
       ));
     }
     return burndownData;
   }
-  
-    Future<void> addTask(int projectId, String title, int storyPoints) async {
+
+  Future<void> deleteTask(String taskId, int projectId) async {
+    final projectIndex = _projects.indexWhere((p) => p.id == projectId);
+    if (projectIndex == -1) return;
+
+    final taskIndex = _projects[projectIndex].tasks.indexWhere((t) => t.id == taskId);
+    if (taskIndex == -1) return;
+
+    final taskToRemove = _projects[projectIndex].tasks.removeAt(taskIndex);
+    notifyListeners();
+
+    try {
+      final response = await http.post(Uri.parse('$_baseUrl/delete_task.php'), body: {
+        'task_id': taskId,
+      });
+      final responseData = json.decode(response.body);
+      if (responseData['status'] != 'success') {
+        throw Exception('Gagal menghapus tugas di server');
+      }
+    } catch (e) {
+      _setError("Gagal menghapus tugas: ${e.toString().replaceAll('Exception: ', '')}");
+      _projects[projectIndex].tasks.insert(taskIndex, taskToRemove);
+      notifyListeners();
+    }
+  }
+
+  Future<void> addTask(int projectId, String title, int storyPoints) async {
     _setError(null);
     try {
       final response = await http.post(Uri.parse('$_baseUrl/add_task.php'), body: {
@@ -251,7 +244,6 @@ class SprintProvider with ChangeNotifier {
         throw Exception('Gagal terhubung ke server (Error: ${response.statusCode})');
       }
     } catch (e) {
-      debugPrint("Error in addTask: ${e.toString()}");
       _setError("Gagal menambah tugas: ${e.toString().replaceAll('Exception: ', '')}");
     } 
   }

@@ -24,9 +24,9 @@ class _HomePageState extends State<HomePage> {
 
   final List<BottomNavigationBarItem> _items = const [
     BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
-    BottomNavigationBarItem(icon: Icon(Icons.folder_open), label: 'Projects'),
-    BottomNavigationBarItem(icon: Icon(Icons.notifications), label: 'Notifs'),
-    BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
+    BottomNavigationBarItem(icon: Icon(Icons.folder_open), label: 'Proyek'),
+    BottomNavigationBarItem(icon: Icon(Icons.notifications), label: 'Notifikasi'),
+    BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Pengaturan'),
   ];
 
   @override
@@ -38,9 +38,9 @@ class _HomePageState extends State<HomePage> {
         currentIndex: _index,
         onTap: (i) => setState(() => _index = i),
         items: _items,
-        selectedItemColor: Colors.blue, // warna icon/text saat aktif
-        unselectedItemColor: Colors.grey, // warna icon/text saat nonaktif
-        showUnselectedLabels: true, // tampilkan label walau nonaktif
+        selectedItemColor: Colors.blue, // warna ikon/teks saat aktif
+        unselectedItemColor: Colors.grey, // warna ikon/teks saat tidak aktif
+        showUnselectedLabels: true, // tampilkan label meskipun tidak aktif
       ),
     );
   }

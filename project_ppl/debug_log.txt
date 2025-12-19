@@ -1,0 +1,15 @@
+[2025-12-18 14:03:10] Script update_task_status.php started.
+[2025-12-18 14:03:10] Data POST yang diterima:
+[2025-12-18 14:03:10] Array
+(
+    [task_id] => 103
+    [new_status] => done
+    [assigned_sprint] => 3
+    [completion_sprint] => 3
+)
+
+[2025-12-18 14:03:10] Data yang diekstrak: task_id=103, new_status=done, assigned_sprint=3
+[2025-12-18 14:03:10] Nilai completion_sprint_to_set: 3
+[2025-12-18 14:03:10] Query SQL yang akan dijalankan: UPDATE tasks SET status = ?, assigned_sprint = ?, completion_sprint = ? WHERE id = ?
+[2025-12-18 14:03:10] Parameter yang di-bind: status=done, assigned_sprint=3, completion_sprint=3, id=103
+[2025-12-18 14:03:11] SQL EXECUTE SUCCESSFUL.
