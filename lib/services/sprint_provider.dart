@@ -8,6 +8,7 @@ class SprintProvider with ChangeNotifier {
   final String _baseUrl = kIsWeb ? 'http://localhost/project_ppl' : 'http://10.0.2.2/project_ppl';
 
   List<Project> _projects = [];
+  List<NotificationItem> _notifications = [];
   bool _isLoading = false;
   String? _errorMessage;
   
@@ -17,6 +18,7 @@ class SprintProvider with ChangeNotifier {
   String? _fullName;
 
   List<Project> get projects => _projects;
+  List<NotificationItem> get notifications => _notifications;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   
@@ -75,6 +77,24 @@ class SprintProvider with ChangeNotifier {
       _setError("Gagal memuat proyek: ${e.toString().replaceAll('Exception: ', '')}");
     } finally {
       _setLoading(false);
+    }
+  }
+  
+  Future<void> fetchNotifications() async {
+    if (_userId == null) return;
+
+    try {
+      final response = await http.get(Uri.parse('$_baseUrl/get_notifications.php?user_id=$_userId'));
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+        if (responseData['status'] == 'success') {
+          final List<dynamic> notifData = responseData['data'];
+          _notifications = notifData.map((json) => NotificationItem.fromJson(json)).toList();
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      debugPrint("Gagal memuat notifikasi: $e");
     }
   }
 
@@ -237,6 +257,7 @@ class SprintProvider with ChangeNotifier {
         final responseData = json.decode(response.body);
         if (responseData['status'] == 'success') {
           await fetchProjects();
+          fetchNotifications(); // Update notifikasi setelah menambah task
         } else {
           throw Exception(responseData['message'] ?? 'Gagal menambah tugas di server');
         }

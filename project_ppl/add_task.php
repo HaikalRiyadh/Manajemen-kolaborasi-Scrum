@@ -29,6 +29,9 @@ if ($project_id <= 0 || $title === '' || $story_points <= 0) {
 
 // 3. --- OPERASI DATABASE ---
 try {
+    $conn->begin_transaction();
+
+    // Insert Task
     $stmt = $conn->prepare("INSERT INTO tasks (project_id, title, status, story_points) VALUES (?, ?, ?, ?)");
     if ($stmt === false) {
         throw new Exception("Gagal menyiapkan statement: " . $conn->error);
@@ -37,13 +40,36 @@ try {
     $stmt->bind_param("issi", $project_id, $title, $status, $story_points);
     $stmt->execute();
     $insert_id = $conn->insert_id;
+    $stmt->close();
 
-    sendJsonResponse(201, ["status" => "success", "message" => "Tugas berhasil dibuat", "id" => strval($insert_id)]); // Kirim ID sebagai string
+    // Ambil user_id pemilik project untuk notifikasi
+    $stmtUser = $conn->prepare("SELECT user_id, name FROM projects WHERE id = ?");
+    $stmtUser->bind_param("i", $project_id);
+    $stmtUser->execute();
+    $resultUser = $stmtUser->get_result();
+    
+    if ($rowUser = $resultUser->fetch_assoc()) {
+        $user_id = $rowUser['user_id'];
+        $project_name = $rowUser['name'];
+
+        // Insert Notification
+        $notifTitle = "Tugas Baru di $project_name";
+        $notifMessage = "Tugas '$title' ($story_points SP) telah ditambahkan.";
+        
+        $stmtNotif = $conn->prepare("INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, 'task_created')");
+        $stmtNotif->bind_param("iss", $user_id, $notifTitle, $notifMessage);
+        $stmtNotif->execute();
+        $stmtNotif->close();
+    }
+    $stmtUser->close();
+
+    $conn->commit();
+    sendJsonResponse(201, ["status" => "success", "message" => "Tugas berhasil dibuat", "id" => strval($insert_id)]);
 
 } catch (Exception $e) {
+    $conn->rollback();
     sendJsonResponse(500, ["status" => "error", "message" => "Gagal memasukkan tugas ke database: " . $e->getMessage()]);
 } finally {
-    if (isset($stmt)) $stmt->close();
     if (isset($conn)) $conn->close();
 }
 ?>

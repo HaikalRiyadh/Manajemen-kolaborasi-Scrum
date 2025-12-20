@@ -53,11 +53,11 @@ class _ScrumPageState extends State<ScrumPage> {
                 const SizedBox(height: 16.0),
                 TextFormField(
                   controller: storyPointsController,
-                  decoration: const InputDecoration(labelText: 'Poin Cerita'),
+                  decoration: const InputDecoration(labelText: 'Story Point'),
                   keyboardType: TextInputType.number,
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Silakan masukkan poin cerita.';
+                      return 'Silakan masukkan story point.';
                     }
                     if (int.tryParse(value) == null) {
                       return 'Silakan masukkan nomor yang valid.';
@@ -114,7 +114,7 @@ class _ScrumPageState extends State<ScrumPage> {
                   ),
                   const SizedBox(height: 4),
                   Chip(
-                    label: Text('${task.storyPoints} Poin Cerita'),
+                    label: Text('${task.storyPoints} Story Point'),
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     labelStyle: const TextStyle(fontSize: 12),
                     backgroundColor: Colors.blueGrey[50],
