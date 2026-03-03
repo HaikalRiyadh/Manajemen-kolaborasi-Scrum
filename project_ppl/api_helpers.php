@@ -54,15 +54,16 @@ if (php_sapi_name() !== 'cli') {
     }
 }
 
-// 6. KONEKSI DATABASE
-$servername = "127.0.0.1";
-$username_db = "root";
-$password_db = "";
-$dbname = "lib_scrum_app";
+// 6. KONEKSI DATABASE (mendukung environment variables untuk Docker/Cloud)
+$servername = getenv('DB_HOST') ?: "127.0.0.1";
+$username_db = getenv('DB_USER') ?: "root";
+$password_db = getenv('DB_PASSWORD') ?: "";
+$dbname = getenv('DB_NAME') ?: "lib_scrum_app";
+$db_port = intval(getenv('DB_PORT') ?: 3306);
 
 // Gunakan try-catch khusus untuk koneksi awal
 try {
-    $conn = new mysqli($servername, $username_db, $password_db, $dbname);
+    $conn = new mysqli($servername, $username_db, $password_db, $dbname, $db_port);
     if ($conn->connect_error) {
         throw new Exception("Database connection failed: " . $conn->connect_error);
     }

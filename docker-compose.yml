@@ -1,0 +1,81 @@
+# ====================================================
+# Docker Compose - Full Stack Deployment
+# Scrum Management App (PHP + MySQL + phpMyAdmin)
+# ====================================================
+# Usage:
+#   docker-compose up -d        → Start semua service
+#   docker-compose down         → Stop semua service
+#   docker-compose logs -f api  → Lihat log backend
+# ====================================================
+
+services:
+  # ── MySQL Database ──────────────────────────────────
+  db:
+    image: mysql:8.0
+    container_name: scrum_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-scrumapp123}
+      MYSQL_DATABASE: ${DB_NAME:-lib_scrum_app}
+      MYSQL_USER: ${DB_USER:-scrum_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-scrum_pass}
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./project_ppl/projects.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-scrumapp123}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - scrum_network
+
+  # ── PHP Backend API ─────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: scrum_api
+    restart: unless-stopped
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: ${DB_USER:-root}
+      DB_PASSWORD: ${DB_ROOT_PASSWORD:-scrumapp123}
+      DB_NAME: ${DB_NAME:-lib_scrum_app}
+    ports:
+      - "${API_PORT:-8080}:80"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - scrum_network
+
+  # ── phpMyAdmin (opsional, untuk dev) ────────────────
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: scrum_phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-scrumapp123}
+    ports:
+      - "${PMA_PORT:-8081}:80"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - scrum_network
+    profiles:
+      - dev  # Hanya aktif dengan: docker-compose --profile dev up
+
+volumes:
+  db_data:
+    driver: local
+
+networks:
+  scrum_network:
+    driver: bridge

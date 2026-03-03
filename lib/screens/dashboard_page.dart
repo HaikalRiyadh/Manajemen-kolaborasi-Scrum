@@ -144,7 +144,18 @@ class BurndownChartCard extends StatelessWidget {
             ),
             const Divider(height: 24),
             const Text('Burndown Chart', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 20),
+            const SizedBox(height: 8),
+            // Legend
+            Row(
+              children: [
+                _buildLegendItem(Colors.blue, 'Estimasi (Ideal)', dashed: true),
+                const SizedBox(width: 16),
+                _buildLegendItem(Colors.red.shade700, 'Aktual'),
+                const SizedBox(width: 16),
+                _buildLegendItem(Colors.green, 'Sprint Saat Ini', isVertical: true),
+              ],
+            ),
+            const SizedBox(height: 12),
             burndownData.isEmpty
                 ? const SizedBox(height: 200, child: Center(child: Text('Data tidak cukup untuk menampilkan chart.')))
                 : _buildChart(context, burndownData, totalStoryPoints, project.sprint),
@@ -154,7 +165,32 @@ class BurndownChartCard extends StatelessWidget {
     );
   }
 
+  Widget _buildLegendItem(Color color, String label, {bool dashed = false, bool isVertical = false}) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        isVertical
+            ? Container(width: 2, height: 14, color: color)
+            : Container(
+                width: 24,
+                height: 3,
+                decoration: BoxDecoration(
+                  color: dashed ? Colors.transparent : color,
+                  border: dashed ? Border(bottom: BorderSide(color: color, width: 2, style: BorderStyle.solid)) : null,
+                ),
+                child: dashed
+                    ? CustomPaint(painter: _DashedLinePainter(color: color))
+                    : null,
+              ),
+        const SizedBox(width: 4),
+        Text(label, style: const TextStyle(fontSize: 11, color: Colors.black54)),
+      ],
+    );
+  }
+
   Widget _buildChart(BuildContext context, List<BurndownData> data, int totalStoryPoints, int totalSprints) {
+    final currentSprint = project.currentSprint;
+
     return SizedBox(
       height: 220,
       child: LineChart(
@@ -184,27 +220,79 @@ class BurndownChartCard extends StatelessWidget {
             ),
           ),
           borderData: FlBorderData(show: false),
+          // Garis vertikal penunjuk sprint saat ini
+          extraLinesData: ExtraLinesData(
+            verticalLines: [
+              VerticalLine(
+                x: currentSprint.toDouble(),
+                color: Colors.green.withValues(alpha: 0.6),
+                strokeWidth: 2,
+                dashArray: [4, 4],
+                label: VerticalLineLabel(
+                  show: true,
+                  alignment: Alignment.topRight,
+                  style: const TextStyle(fontSize: 10, color: Colors.green, fontWeight: FontWeight.bold),
+                  labelResolver: (_) => 'Sprint $currentSprint',
+                ),
+              ),
+            ],
+          ),
           lineBarsData: [
-            // Garis Estimasi (Ideal)
+            // Garis Estimasi (Ideal) - Biru putus-putus
             LineChartBarData(
               spots: data.map((d) => FlSpot(d.sprint.toDouble(), d.estimated.toDouble())).toList(),
               isCurved: false,
-              color: Colors.purple.withValues(alpha: 0.5),
+              color: Colors.blue,
               barWidth: 2,
               isStrokeCapRound: true,
               dotData: const FlDotData(show: false),
-              dashArray: [5, 5],
+              dashArray: [6, 4],
+              belowBarData: BarAreaData(
+                show: true,
+                color: Colors.blue.withValues(alpha: 0.05),
+              ),
             ),
-            // Garis Aktual
+            // Garis Aktual - Merah solid
             LineChartBarData(
               spots: data.map((d) => FlSpot(d.sprint.toDouble(), d.actual.toDouble())).toList(),
               isCurved: false,
-              color: Colors.purple,
+              color: Colors.red.shade700,
               barWidth: 3,
               isStrokeCapRound: true,
-              dotData: const FlDotData(show: true),
+              dotData: FlDotData(
+                show: true,
+                getDotPainter: (spot, percent, barData, index) {
+                  return FlDotCirclePainter(
+                    radius: 3,
+                    color: Colors.white,
+                    strokeWidth: 2,
+                    strokeColor: Colors.red.shade700,
+                  );
+                },
+              ),
+              belowBarData: BarAreaData(
+                show: true,
+                color: Colors.red.withValues(alpha: 0.05),
+              ),
             ),
           ],
+          lineTouchData: LineTouchData(
+            touchTooltipData: LineTouchTooltipData(
+              getTooltipItems: (touchedSpots) {
+                return touchedSpots.map((spot) {
+                  final isEstimated = spot.barIndex == 0;
+                  return LineTooltipItem(
+                    '${isEstimated ? "Estimasi" : "Aktual"}: ${spot.y.toInt()} pts',
+                    TextStyle(
+                      color: isEstimated ? Colors.blue : Colors.red.shade700,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  );
+                }).toList();
+              },
+            ),
+          ),
           gridData: const FlGridData(
             show: true,
             drawVerticalLine: true,
@@ -237,4 +325,33 @@ class BurndownChartCard extends StatelessWidget {
     }
     return Container();
   }
+}
+
+/// Custom painter untuk menggambar garis putus-putus di legend
+class _DashedLinePainter extends CustomPainter {
+  final Color color;
+  _DashedLinePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke;
+
+    const dashWidth = 4.0;
+    const dashSpace = 3.0;
+    double startX = 0;
+    while (startX < size.width) {
+      canvas.drawLine(
+        Offset(startX, size.height / 2),
+        Offset(startX + dashWidth, size.height / 2),
+        paint,
+      );
+      startX += dashWidth + dashSpace;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

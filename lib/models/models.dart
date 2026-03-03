@@ -127,3 +127,42 @@ class NotificationItem {
     );
   }
 }
+
+/// Model untuk Daily Scrum Log (standup meeting)
+class DailyScrumLog {
+  final int id;
+  final int userId;
+  final int projectId;
+  final String yesterday;
+  final String today;
+  final String blockers;
+  final String username;
+  final DateTime scrumDate;
+  final DateTime createdAt;
+
+  DailyScrumLog({
+    required this.id,
+    required this.userId,
+    required this.projectId,
+    required this.yesterday,
+    required this.today,
+    required this.blockers,
+    this.username = '',
+    required this.scrumDate,
+    required this.createdAt,
+  });
+
+  factory DailyScrumLog.fromJson(Map<String, dynamic> json) {
+    return DailyScrumLog(
+      id: int.parse(json['id'].toString()),
+      userId: int.parse(json['user_id'].toString()),
+      projectId: int.parse(json['project_id'].toString()),
+      yesterday: json['yesterday'] ?? '',
+      today: json['today'] ?? '',
+      blockers: json['blockers'] ?? '',
+      username: json['username'] ?? '',
+      scrumDate: DateTime.parse(json['scrum_date']),
+      createdAt: DateTime.parse(json['created_at']),
+    );
+  }
+}

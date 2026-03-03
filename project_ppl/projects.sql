@@ -60,3 +60,20 @@ CREATE TABLE IF NOT EXISTS `notifications` (
   PRIMARY KEY (`id`),
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 );
+
+-- ==============================
+-- TABEL: daily_scrums (DAILY STAND-UP LOG)
+-- ==============================
+CREATE TABLE IF NOT EXISTS `daily_scrums` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `user_id` INT(11) NOT NULL,
+  `project_id` INT(11) NOT NULL,
+  `yesterday` TEXT NOT NULL COMMENT 'Apa yang dikerjakan kemarin',
+  `today` TEXT NOT NULL COMMENT 'Apa yang akan dikerjakan hari ini',
+  `blockers` TEXT DEFAULT '' COMMENT 'Hambatan/blocker yang dihadapi',
+  `scrum_date` DATE NOT NULL DEFAULT (CURRENT_DATE),
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`project_id`) REFERENCES `projects`(`id`) ON DELETE CASCADE
+);

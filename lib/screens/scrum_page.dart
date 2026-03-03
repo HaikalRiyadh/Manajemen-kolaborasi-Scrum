@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:project/models/models.dart';
 import 'package:project/services/sprint_provider.dart';
 import 'package:provider/provider.dart';
+import 'daily_scrum_page.dart';
 
 class ScrumPage extends StatefulWidget {
   final int projectId;
@@ -217,7 +218,31 @@ class _ScrumPageState extends State<ScrumPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Papan Scrum - Proyek #${widget.projectId}")),
+      appBar: AppBar(
+        title: Text("Papan Scrum - Proyek #${widget.projectId}"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.record_voice_over),
+            tooltip: 'Daily Scrum',
+            onPressed: () {
+              final provider = Provider.of<SprintProvider>(context, listen: false);
+              final project = provider.projects.firstWhere(
+                (p) => p.id == widget.projectId,
+                orElse: () => Project(id: 0, name: 'Proyek', sprint: 0),
+              );
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => DailyScrumPage(
+                    projectId: widget.projectId,
+                    projectName: project.name,
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(12.0),
@@ -240,7 +265,11 @@ class _ScrumPageState extends State<ScrumPage> {
                 return const Center(child: Text("Proyek tidak ditemukan..."));
               }
 
-              final List<String> mainColumns = ['Perencanaan Sprint', 'Sprint 1', 'Sprint 2', 'Sprint 3'];
+              final int totalSprints = project.sprint > 0 ? project.sprint : 3;
+              final List<String> mainColumns = [
+                'Perencanaan Sprint',
+                for (int i = 1; i <= totalSprints; i++) 'Sprint $i',
+              ];
 
               return SingleChildScrollView(
                 scrollDirection: Axis.horizontal,

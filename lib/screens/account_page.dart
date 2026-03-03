@@ -25,6 +25,8 @@ class AccountPage extends StatelessWidget {
     final provider = context.watch<SprintProvider>();
     final username = provider.username ?? "Tidak diketahui";
     final fullName = provider.fullName ?? "Tidak diketahui";
+    final role = provider.role;
+    final roleDisplay = role == 'scrum_master' ? 'Scrum Master' : 'Developer';
     
     return Scaffold(
       appBar: AppBar(
@@ -34,10 +36,34 @@ class AccountPage extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
-          const Center(
-            child: CircleAvatar(
-              radius: 50,
-              child: Icon(Icons.person, size: 50),
+          Center(
+            child: Column(
+              children: [
+                CircleAvatar(
+                  radius: 50,
+                  backgroundColor: role == 'scrum_master' ? Colors.orange : Colors.blue,
+                  child: Icon(
+                    role == 'scrum_master' ? Icons.admin_panel_settings : Icons.person,
+                    size: 50,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: role == 'scrum_master' ? Colors.orange.shade100 : Colors.blue.shade100,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    roleDisplay,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: role == 'scrum_master' ? Colors.orange.shade800 : Colors.blue.shade800,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 20),
@@ -55,6 +81,36 @@ class AccountPage extends StatelessWidget {
               subtitle: Text(fullName), // Data asli
             ),
           ),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.security),
+              title: const Text('Role'),
+              subtitle: Text(roleDisplay),
+              trailing: Icon(
+                role == 'scrum_master' ? Icons.star : Icons.code,
+                color: role == 'scrum_master' ? Colors.orange : Colors.blue,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (provider.isScrumMaster)
+            Card(
+              color: Colors.orange.shade50,
+              child: const Padding(
+                padding: EdgeInsets.all(12.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Hak Akses Scrum Master:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    SizedBox(height: 4),
+                    Text('• Membuat proyek baru'),
+                    Text('• Mengelola tim & roles'),
+                    Text('• Melihat semua daily scrum log'),
+                    Text('• Mengatur sprint planning'),
+                  ],
+                ),
+              ),
+            ),
           const SizedBox(height: 30),
           ElevatedButton(
             onPressed: () => _logout(context),

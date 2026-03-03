@@ -64,15 +64,18 @@ class _LoginPageState extends State<LoginPage> {
           final int userId = int.parse(data['data']['id'].toString());
           final String username = data['data']['username'];
           final String fullName = data['data']['full_name'];
-          
-          // Simpan ke SprintProvider agar bisa dipakai di halaman Account
-          Provider.of<SprintProvider>(context, listen: false).setUserData(userId, username, fullName);
+            final String role = data['data']['role'] ?? 'developer';
+            
+            // Simpan ke SprintProvider agar bisa dipakai di halaman Account
+            Provider.of<SprintProvider>(context, listen: false).setUserData(userId, username, fullName, role: role);
 
-          // Navigasi ke halaman utama
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const HomePage()),
-          );
+            // Navigasi ke HomePage setelah login berhasil
+            if (mounted) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const HomePage()),
+              );
+            }
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(data['message'] ?? "Login gagal")),

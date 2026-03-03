@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:async';
 import '../models/models.dart';
 
 class SprintProvider with ChangeNotifier {
@@ -8,6 +9,7 @@ class SprintProvider with ChangeNotifier {
 
   List<Project> _projects = [];
   List<NotificationItem> _notifications = [];
+  List<DailyScrumLog> _dailyScrumLogs = [];
   bool _isLoading = false;
   String? _errorMessage;
   
@@ -15,9 +17,14 @@ class SprintProvider with ChangeNotifier {
   int? _userId;
   String? _username;
   String? _fullName;
+  String _role = 'developer'; // Default role
+
+  // Notification polling timer
+  Timer? _notificationTimer;
 
   List<Project> get projects => _projects;
   List<NotificationItem> get notifications => _notifications;
+  List<DailyScrumLog> get dailyScrumLogs => _dailyScrumLogs;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   
@@ -25,13 +32,47 @@ class SprintProvider with ChangeNotifier {
   int? get userId => _userId;
   String? get username => _username;
   String? get fullName => _fullName;
+  String get role => _role;
+
+  // Permission helpers berdasarkan role
+  bool get isScrumMaster => _role == 'scrum_master';
+  bool get isDeveloper => _role == 'developer' || _role == 'user';
+  bool get canCreateProject => isScrumMaster;
+  bool get canManageRoles => isScrumMaster;
 
   // Fungsi untuk menyimpan data user saat login
-  void setUserData(int id, String username, String fullName) {
+  void setUserData(int id, String username, String fullName, {String role = 'developer'}) {
     _userId = id;
     _username = username;
     _fullName = fullName;
+    _role = role;
     notifyListeners();
+    // Start notification polling saat user login
+    if (id > 0) {
+      _startNotificationPolling();
+    } else {
+      _stopNotificationPolling();
+    }
+  }
+
+  /// Start polling notifikasi setiap 30 detik
+  void _startNotificationPolling() {
+    _stopNotificationPolling();
+    _notificationTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      fetchNotifications();
+    });
+  }
+
+  /// Stop polling notifikasi
+  void _stopNotificationPolling() {
+    _notificationTimer?.cancel();
+    _notificationTimer = null;
+  }
+
+  @override
+  void dispose() {
+    _stopNotificationPolling();
+    super.dispose();
   }
 
   void _setLoading(bool loading) {
@@ -266,5 +307,65 @@ class SprintProvider with ChangeNotifier {
     } catch (e) {
       _setError("Gagal menambah tugas: ${e.toString().replaceAll('Exception: ', '')}");
     } 
+  }
+
+  // =================== DAILY SCRUM LOG ===================
+
+  /// Fetch daily scrum logs untuk project tertentu
+  Future<void> fetchDailyScrumLogs(int projectId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/get_daily_scrums.php?project_id=$projectId'),
+      );
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+        if (responseData['status'] == 'success') {
+          final List<dynamic> logData = responseData['data'];
+          _dailyScrumLogs = logData.map((json) => DailyScrumLog.fromJson(json)).toList();
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      debugPrint("Gagal memuat daily scrum logs: $e");
+    }
+  }
+
+  /// Tambah daily scrum log baru
+  Future<bool> addDailyScrumLog({
+    required int projectId,
+    required String yesterday,
+    required String today,
+    required String blockers,
+  }) async {
+    if (_userId == null) return false;
+    _setError(null);
+
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/add_daily_scrum.php'),
+        body: {
+          'user_id': _userId.toString(),
+          'project_id': projectId.toString(),
+          'yesterday': yesterday,
+          'today': today,
+          'blockers': blockers,
+        },
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final responseData = json.decode(response.body);
+        if (responseData['status'] == 'success') {
+          await fetchDailyScrumLogs(projectId);
+          return true;
+        } else {
+          throw Exception(responseData['message'] ?? 'Gagal menambah daily scrum');
+        }
+      } else {
+        throw Exception('Server error: ${response.statusCode}');
+      }
+    } catch (e) {
+      _setError("Gagal menambah daily scrum: ${e.toString().replaceAll('Exception: ', '')}");
+      return false;
+    }
   }
 }

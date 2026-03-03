@@ -1,0 +1,46 @@
+# ====================================================
+# .dockerignore - Scrum Management App
+# ====================================================
+# Exclude Flutter / Dart files (hanya backend yang di-deploy)
+lib/
+test/
+build/
+android/
+ios/
+linux/
+macos/
+windows/
+web/
+
+# IDE & config
+.dart_tool/
+.idea/
+*.iml
+.vscode/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+
+# Git
+.git/
+.gitignore
+
+# Docs & misc
+README.md
+docs/
+*.md
+analysis_options.yaml
+devtools_options.yaml
+pubspec.yaml
+pubspec.lock
+
+# Environment (jangan masukkan secrets ke image)
+.env
+.env.local
+
+# Nested project
+Manajemen-kolaborasi-Scrum/
+
+# Test files backend (opsional, exclude dari production)
+project_ppl/tests/
+project_ppl/debug_log.txt
