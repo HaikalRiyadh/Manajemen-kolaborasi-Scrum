@@ -323,15 +323,12 @@ Aplikasi menggunakan **Client-Server Architecture** dengan pola **Provider State
 
 ## 📸 Screenshots / Preview
 
-> Tambahkan screenshot di folder `docs/screenshots/` dan update path di bawah.
-
 | Screen | Preview |
 |--------|---------|
-| **Login Page** | ![Login](docs/screenshots/login.png) |
 | **Dashboard + Burndown** | ![Dashboard](docs/screenshots/dashboard.png) |
 | **Scrum Board** | ![Scrum Board](docs/screenshots/scrum_board.png) |
 | **Daily Scrum Log** | ![Daily Scrum](docs/screenshots/daily_scrum.png) |
-| **Notifications** | ![Notifications](docs/screenshots/notifications.png) |
+| **Notifikasi** | ![Notifikasi](docs/screenshots/notifikasi.png) |
 
 ---
 
