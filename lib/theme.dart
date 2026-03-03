@@ -55,7 +55,7 @@ class AppTheme {
       ),
       focusedBorder: OutlineInputBorder( // Border saat field mendapatkan fokus
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: primary, width: 2.0), // Menggunakan warna primer tema
+        borderSide: const BorderSide(color: primary, width: 2.0), // Menggunakan warna primer tema
       ),
       // Anda juga bisa mendefinisikan errorBorder, focusedErrorBorder, dll.
     ),

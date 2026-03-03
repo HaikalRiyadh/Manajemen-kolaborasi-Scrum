@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({Key? key}) : super(key: key);
+  const LoginPage({super.key});
 
   @override
-  _LoginPageState createState() => _LoginPageState();
+  State<LoginPage> createState() => _LoginPageState();
 }
 
 class _LoginPageState extends State<LoginPage> {
@@ -19,11 +19,12 @@ class _LoginPageState extends State<LoginPage> {
       emailController.text.trim(),
       passwordController.text.trim(),
     );
+    if (!mounted) return;
     setState(() { loading = false; });
 
     if (result.containsKey('token')) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login berhasil')),
+        const SnackBar(content: Text('Login berhasil')),
       );
     } else {
       final msg = result['message'] ?? 'Login gagal';

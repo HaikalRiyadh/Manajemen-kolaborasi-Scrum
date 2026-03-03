@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/sprint_provider.dart';
-import '../models/models.dart';
 import 'package:intl/intl.dart';
 
 class NotificationsPage extends StatefulWidget {

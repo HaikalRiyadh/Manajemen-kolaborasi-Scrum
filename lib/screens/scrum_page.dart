@@ -162,9 +162,8 @@ class _ScrumPageState extends State<ScrumPage> {
 
     return Expanded(
       child: DragTarget<ScrumTask>(
-        onWillAccept: (task) {
-          if (task == null) return false;
-
+        onWillAcceptWithDetails: (details) {
+          final task = details.data;
           bool isFromAnotherSprint = task.assignedSprint != sprintNumber;
           bool isFromSameSprint = task.assignedSprint == sprintNumber;
           bool isFromBacklog = task.status == TaskStatus.backlog;
@@ -178,7 +177,8 @@ class _ScrumPageState extends State<ScrumPage> {
           // 'In Progress' dan 'Done' hanya menerima tugas dari dalam sprint yang sama.
           return isFromSameSprint && task.status != status;
         },
-        onAccept: (task) {
+        onAcceptWithDetails: (details) {
+            final task = details.data;
             TaskStatus newStatus = status;
             // Jika tugas berasal dari sprint lain, statusnya diatur ulang menjadi 'To Do'.
             if (task.assignedSprint != sprintNumber) {

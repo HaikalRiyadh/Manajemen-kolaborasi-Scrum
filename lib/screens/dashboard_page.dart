@@ -143,7 +143,7 @@ class BurndownChartCard extends StatelessWidget {
               ],
             ),
             const Divider(height: 24),
-            Text('Burndown Chart', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            const Text('Burndown Chart', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             const SizedBox(height: 20),
             burndownData.isEmpty
                 ? const SizedBox(height: 200, child: Center(child: Text('Data tidak cukup untuk menampilkan chart.')))
@@ -189,7 +189,7 @@ class BurndownChartCard extends StatelessWidget {
             LineChartBarData(
               spots: data.map((d) => FlSpot(d.sprint.toDouble(), d.estimated.toDouble())).toList(),
               isCurved: false,
-              color: Colors.purple.withOpacity(0.5),
+              color: Colors.purple.withValues(alpha: 0.5),
               barWidth: 2,
               isStrokeCapRound: true,
               dotData: const FlDotData(show: false),

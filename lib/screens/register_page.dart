@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'; // Diperlukan untuk kIsWeb
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:async';
 import '../widgets/custom_input.dart';
 import '../screens/login_page.dart';
 
@@ -22,9 +23,9 @@ class _RegisterPageState extends State<RegisterPage> {
   Future<void> register() async {
     final username = usernameController.text.trim();
     final password = passwordController.text;
-    final full_name = nameController.text.trim();
+    final fullName = nameController.text.trim();
 
-    if (full_name.isEmpty ||
+    if (fullName.isEmpty ||
         username.isEmpty ||
         password.isEmpty ||
         confirmPasswordController.text.isEmpty) {
@@ -45,8 +46,10 @@ class _RegisterPageState extends State<RegisterPage> {
       _isLoading = true;
     });
 
-    final String baseUrl = kIsWeb ? 'http://localhost/project_ppl' : 'http://10.0.2.2/project_ppl';
+    const String baseUrl = kIsWeb ? 'http://localhost/project_ppl' : 'http://10.0.2.2/project_ppl';
     final url = Uri.parse('$baseUrl/register.php');
+
+    debugPrint('[REGISTER] Mengirim request ke: $url');
 
     try {
       final response = await http.post(
@@ -54,11 +57,14 @@ class _RegisterPageState extends State<RegisterPage> {
         body: {
           'username': username,
           'password': password,
-          'full_name': full_name,
+          'full_name': fullName,
         },
-      );
+      ).timeout(const Duration(seconds: 15));
 
       if (!mounted) return;
+
+      debugPrint('[REGISTER] Status: ${response.statusCode}');
+      debugPrint('[REGISTER] Body: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         try {
@@ -81,7 +87,7 @@ class _RegisterPageState extends State<RegisterPage> {
            // TAMPILKAN PESAN ERROR DARI SERVER LANGSUNG KE PENGGUNA UNTUK DEBUGGING
            // Ambil 200 karakter pertama dari respons untuk ditampilkan
            String serverError = response.body.length > 200 
-               ? response.body.substring(0, 200) + "..." 
+               ? '${response.body.substring(0, 200)}...' 
                : response.body;
            
            if (serverError.isEmpty) serverError = "Respon kosong dari server.";
@@ -120,10 +126,20 @@ class _RegisterPageState extends State<RegisterPage> {
           SnackBar(content: Text("Server error: ${response.statusCode}.")),
         );
       }
+    } on TimeoutException {
+      if (!mounted) return;
+      debugPrint('[REGISTER] Request timeout!');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Koneksi ke server timeout. Pastikan server PHP berjalan.")),
+      );
     } catch (e) {
       if (!mounted) return;
+      debugPrint('[REGISTER] Error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Gagal terhubung ke server: $e")),
+        SnackBar(
+          content: Text("Gagal terhubung ke server: $e"),
+          duration: const Duration(seconds: 5),
+        ),
       );
     } finally {
       if (mounted) {

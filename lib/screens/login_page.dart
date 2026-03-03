@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'dart:convert';
+import 'dart:async';
 
 import '../services/sprint_provider.dart';
 import '../screens/register_page.dart';
@@ -36,8 +37,10 @@ class _LoginPageState extends State<LoginPage> {
       _isLoading = true;
     });
 
-    final String baseUrl = kIsWeb ? 'http://localhost/project_ppl' : 'http://10.0.2.2/project_ppl';
+    const String baseUrl = kIsWeb ? 'http://localhost/project_ppl' : 'http://10.0.2.2/project_ppl';
     final url = Uri.parse('$baseUrl/login.php');
+
+    debugPrint('[LOGIN] Mengirim request ke: $url');
 
     try {
       final response = await http.post(
@@ -46,9 +49,12 @@ class _LoginPageState extends State<LoginPage> {
           'username': username,
           'password': password,
         },
-      );
+      ).timeout(const Duration(seconds: 15));
 
       if (!mounted) return;
+
+      debugPrint('[LOGIN] Status: ${response.statusCode}');
+      debugPrint('[LOGIN] Body: ${response.body}');
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = jsonDecode(response.body);
@@ -90,10 +96,20 @@ class _LoginPageState extends State<LoginPage> {
           SnackBar(content: Text("Server error: ${response.statusCode}")),
         );
       }
+    } on TimeoutException {
+      if (!mounted) return;
+      debugPrint('[LOGIN] Request timeout!');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Koneksi ke server timeout. Pastikan server PHP berjalan.")),
+      );
     } catch (e) {
       if (!mounted) return;
+      debugPrint('[LOGIN] Error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Gagal terhubung ke server: $e")),
+        SnackBar(
+          content: Text("Gagal terhubung ke server: $e"),
+          duration: const Duration(seconds: 5),
+        ),
       );
     } finally {
       if (mounted) {

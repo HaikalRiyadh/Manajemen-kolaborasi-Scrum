@@ -8,8 +8,8 @@ import 'package:project/screens/projects_page.dart';
 
 // Mock Provider untuk mengisolasi tes dari network dan database
 class MockSprintProvider extends ChangeNotifier implements SprintProvider {
-  List<Project> _projects = [];
-  bool _isLoading = false;
+  final List<Project> _projects = [];
+  final bool _isLoading = false;
   String? _errorMessage;
 
   @override
@@ -40,10 +40,6 @@ class MockSprintProvider extends ChangeNotifier implements SprintProvider {
 
   // Implementasi sisa dari abstract methods jika ada, dengan behavior kosong
   @override
-  void _setLoading(bool loading) { _isLoading = loading; notifyListeners(); }
-  @override
-  void _setError(String? message) { _errorMessage = message; notifyListeners(); }
-  @override
   void clearError() { _errorMessage = null; notifyListeners(); }
   @override
   Future<void> updateTaskStatus(ScrumTask task, TaskStatus newStatus, int projectId, int sprintNumber) async {}
@@ -53,6 +49,18 @@ class MockSprintProvider extends ChangeNotifier implements SprintProvider {
   Future<void> deleteTask(String taskId, int projectId) async {}
   @override
   Future<void> addTask(int projectId, String title, int storyPoints) async {}
+  @override
+  Future<void> fetchNotifications() async {}
+  @override
+  void setUserData(int id, String username, String fullName) {}
+  @override
+  String? get fullName => null;
+  @override
+  int? get userId => null;
+  @override
+  String? get username => null;
+  @override
+  List<NotificationItem> get notifications => [];
 }
 
 void main() {

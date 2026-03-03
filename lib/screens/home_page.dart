@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dashboard_page.dart';
 import 'projects_page.dart';
-import 'scrum_page.dart';
 import 'notifications_page.dart';
 import 'settings_page.dart';
 
