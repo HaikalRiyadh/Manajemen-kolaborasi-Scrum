@@ -1,13 +1,3 @@
-# Kelompok 3 - PPL PRAK I6
-
-### 👥 Anggota Tim
-*   **Haikal Riyadh Romadhon** (502510310005)
-*   **Tantri Pradipta Kusumawardani** (502510310007)
-*   **Deviani Trinita** (502510310008)
-*   **Jasmine Mumtaz** (502510310010)
-
----
-
 # 📱 Scrum Project Manager
 
 > Aplikasi manajemen proyek berbasis **Agile/Scrum** yang dibangun dengan **Flutter** (frontend) dan **PHP + MySQL** (backend REST API). Mendukung fitur lengkap: Sprint Planning, Scrum Board drag-and-drop, Burndown Chart, Daily Scrum Log, Role-Based Access Control, dan notifikasi cerdas.
